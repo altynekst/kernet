@@ -1,0 +1,88 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: "Architecture"
+        required: true
+        default: arm64
+        type: choice
+        options:
+          - arm64
+          - arm
+          - x86_64
+          - all
+
+jobs:
+  build-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      CARGO_HTTP_MULTIPLEXING: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix line endings
+        run: |
+          find scripts -type f \( -name '*.sh' -o -name 'gradlew' \) -exec sed -i 's/\r$//' {} +
+          find scripts -type f \( -name '*.sh' -o -name 'gradlew' \) -exec chmod +x {} +
+
+      - name: Add prebuilt Android libraries
+        run: |
+          git clone --depth 1 https://github.com/ddnet/ddnet-libs /tmp/upstream-libs
+          find ddnet-libs -type d -name android -prune -exec rm -rf {} +
+          rm -rf ddnet-libs/sdl/java
+          (cd /tmp/upstream-libs && find . -type d \( -name android -o -path './sdl/java' \) -prune -print) | while read -r d; do
+            mkdir -p "ddnet-libs/$d"
+            cp -r "/tmp/upstream-libs/$d/." "ddnet-libs/$d/"
+          done
+          ls ddnet-libs/sdl ddnet-libs/curl
+
+      - name: Prepare Linux
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build openjdk-21-jdk openssl
+          curl -LO https://github.com/Kitware/CMake/releases/download/v3.22.1/cmake-3.22.1-Linux-x86_64.tar.gz
+          mkdir -p /home/runner/cmake
+          tar --strip-components 1 -C /home/runner/cmake -xf cmake-3.22.1-Linux-x86_64.tar.gz
+          rustup default 1.92.0
+          cargo install cargo-ndk
+          rustup target add armv7-linux-androideabi i686-linux-android aarch64-linux-android x86_64-linux-android
+          scripts/android/download_android_sdk.sh /home/runner
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.296.0
+          cache: true
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src/mastersrv
+            src/masterping
+            ./
+
+      - name: Build APK
+        env:
+          TW_KEY_NAME: /home/runner/App.jks
+          TW_KEY_ALIAS: App-Key
+        run: |
+          export TW_KEY_PW="$(openssl rand -base64 32)"
+          keytool -genkey -v -keystore "$TW_KEY_NAME" -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias "$TW_KEY_ALIAS" -storepass "$TW_KEY_PW" -dname "CN=Client, OU=Client, O=Client"
+          export ANDROID_HOME="/home/runner/Android/Sdk"
+          unset ANDROID_SDK_ROOT
+          export PATH=/home/runner/cmake/bin:$PATH
+          scripts/android/cmake_android.sh "${{ inputs.arch }}" DDNet org.ddnet.client Release build-android
+          mkdir artifacts
+          mv build-android/DDNet.apk artifacts/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-android-${{ inputs.arch }}
+          path: artifacts
