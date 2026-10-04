@@ -1,0 +1,27 @@
+{
+  "root_public_key": "TpGBdJqvApGS0QYQLYyl3H+A2qo4G92p8RGQ5v6Wg3Y=",
+  "identities": [
+    {
+      "id": "kernelsyv",
+      "display_name": "kernelsyv",
+      "public_key": "nwz27xQeFOZrFbMNs8SP7gf3WgC2NB6kwyOfahSDrcs=",
+      "roles": [
+        "developer"
+      ],
+      "issued_at": 1784230175,
+      "expires_at": 2099590175,
+      "certificate_signature": "OVGIjQgJH8+YEQTFy87jB3OO7ahoCxogzvcjhi+7LkizFQfeJbEwH0kf/SRPCsMOEeykkRSjviIvtdGqX5BzDg=="
+    },
+    {
+      "id": "\u0412\u0438\u043d\u0438\u041f\u0443\u0445",
+      "display_name": "\u0412\u0438\u043d\u0438\u041f\u0443\u0445",
+      "public_key": "+kL0DwPODyE4isC78j0QA0MsXbec9xXGqhZ2zSDixZE=",
+      "roles": [
+        "developer"
+      ],
+      "issued_at": 1784231697,
+      "expires_at": 2099591697,
+      "certificate_signature": "fJ6QKcxkuBqNZQ0A+MtCNUQG+1g99HXw8etwnlWVm+mfPnePVT22RvLFXdSVHeNyDTfSMmu68vWs5jAUmf7DAA=="
+    }
+  ]
+}

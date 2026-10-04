@@ -1,0 +1,22 @@
+[Unit]
+Description=KernelNet developer identity service
+After=network.target
+
+[Service]
+Type=simple
+User=kernelnet
+Group=kernelnet
+WorkingDirectory=/opt/kernelnet-identity
+Environment=KERNELNET_HOST=127.0.0.1
+Environment=KERNELNET_PORT=8088
+Environment=KERNELNET_SESSION_TTL=15
+ExecStart=/opt/kernelnet-identity/.venv/bin/python /opt/kernelnet-identity/identity_server.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
