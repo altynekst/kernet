@@ -1523,6 +1523,8 @@ set(EXPECTED_DATA
   kernelnet_badge.png
   kernelnet_badge_supporter.png
   kernelnet_badge_tester.png
+  kernelnet_menu_wallpaper.png
+  kernelnet_menu_wallpaper_rgba.png
   languages/arabic.txt
   languages/azerbaijani.txt
   languages/belarusian.txt
