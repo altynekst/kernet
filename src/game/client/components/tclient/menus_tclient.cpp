@@ -43,6 +43,7 @@ enum
 	TCLIENT_TAB_WARLIST,
 	TCLIENT_TAB_BINDCHAT,
 	TCLIENT_TAB_STATUSBAR,
+	TCLIENT_TAB_TROLL,
 	TCLIENT_TAB_INFO,
 	NUMBER_OF_TCLIENT_TABS
 };
@@ -341,6 +342,7 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		TCLocalize("War List"),
 		TCLocalize("Chat Binds"),
 		TCLocalize("Status Bar"),
+		TCLocalize("Troll"),
 		TCLocalize("Info")};
 
 	for(int Tab = 0; Tab < NUMBER_OF_TCLIENT_TABS; ++Tab)
@@ -367,6 +369,8 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		RenderSettingsTClientWarList(MainView);
 	if(s_CurCustomTab == TCLIENT_TAB_STATUSBAR)
 		RenderSettingsTClientStatusBar(MainView);
+	if(s_CurCustomTab == TCLIENT_TAB_TROLL)
+		RenderSettingsTClientTroll(MainView);
 	if(s_CurCustomTab == TCLIENT_TAB_INFO)
 		RenderSettingsTClientInfo(MainView);
 }
@@ -1986,6 +1990,37 @@ void CMenus::RenderSettingsTClientStatusBar(CUIRect MainView)
 		s_SelectedItem = std::max(-1, s_SelectedItem);
 }
 
+void CMenus::RenderSettingsTClientTroll(CUIRect MainView)
+{
+	CUIRect LeftView, RightView, Button, Label;
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Spam Emote"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcSpamEmote, TCLocalize("Spam Emote"), &g_Config.m_TcSpamEmote, &LeftView, LineSize);
+
+	LeftView.HSplitTop(LineSize, &Button, &LeftView);
+	if(g_Config.m_TcSpamEmoteId == 0)
+		Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, TCLocalize("Emote"), 0, 16, &CUi::ms_LinearScrollbarScale, 0, " (cycle all)");
+	else
+		Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, TCLocalize("Emote"), 0, 16, &CUi::ms_LinearScrollbarScale, 0, "");
+
+	LeftView.HSplitTop(LineSize, &Button, &LeftView);
+	Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteInterval, &g_Config.m_TcSpamEmoteInterval, &Button, TCLocalize("Delay"), 500, 10000, &CUi::ms_LinearScrollbarScale, 0, "ms");
+
+	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Notes"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(LineSize * 4.0f, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("The server limits how often emotes are accepted (default 3 seconds). A shorter delay will not make it faster. Starts disabled every time the client launches."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
+}
+
 void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 {
 	CUIRect LeftView, RightView, Button, Label, LowerLeftView;
@@ -2145,6 +2180,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 		TCLocalize("War List"),
 		TCLocalize("Chat Binds"),
 		TCLocalize("Status Bar"),
+		TCLocalize("Troll"),
 		TCLocalize("Info")};
 	static int s_aShowTabs[NUMBER_OF_TCLIENT_TABS] = {};
 	static bool s_TabsInitialized = false;

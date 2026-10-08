@@ -250,6 +250,11 @@ MACRO_CONFIG_INT(TcPetAlpha, tc_pet_alpha, 90, 10, 100, CFGFLAG_CLIENT | CFGFLAG
 MACRO_CONFIG_INT(TcChangeNameNearFinish, tc_change_name_near_finish, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Attempt to change your name when near finish")
 MACRO_CONFIG_STR(TcFinishName, tc_finish_name, 16, "nameless tee", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "Name to change to when near finish when tc_change_name_near_finish is 1")
 
+// Troll
+MACRO_CONFIG_INT(TcSpamEmote, tc_spam_emote, 0, 0, 1, CFGFLAG_CLIENT, "Continuously send emotes (not saved, always starts disabled)")
+MACRO_CONFIG_INT(TcSpamEmoteId, tc_spam_emote_id, 0, 0, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Emote to spam (0 = cycle through all, 1-16 = specific emote)")
+MACRO_CONFIG_INT(TcSpamEmoteInterval, tc_spam_emote_interval, 3000, 500, 10000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay between spammed emotes in milliseconds")
+
 // Flags
 MACRO_CONFIG_INT(TcTClientSettingsTabs, tc_tclient_settings_tabs, 0, 0, 65536, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bit flags to disable settings tabs")
 

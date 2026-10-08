@@ -865,6 +865,7 @@ private:
 	void RenderSettingsTClientChatBinds(CUIRect MainView);
 	void RenderSettingsTClientWarList(CUIRect MainView);
 	void RenderSettingsTClientInfo(CUIRect MainView);
+	void RenderSettingsTClientTroll(CUIRect MainView);
 	void RenderSettingsTClientStatusBar(CUIRect MainView);
 	void RenderSettingsTClientProfiles(CUIRect MainView);
 	void RenderSettingsTClientConfigs(CUIRect MainView);

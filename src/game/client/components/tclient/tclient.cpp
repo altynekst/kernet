@@ -566,6 +566,33 @@ void CTClient::OnRender()
 	}
 
 	DoFinishCheck();
+	DoSpamEmote();
+}
+
+void CTClient::DoSpamEmote()
+{
+	if(!g_Config.m_TcSpamEmote)
+	{
+		m_SpamEmoteNextTime = 0;
+		return;
+	}
+	if(Client()->State() != IClient::STATE_ONLINE || GameClient()->m_Snap.m_LocalClientId < 0)
+		return;
+
+	const int64_t Now = time_get();
+	if(Now < m_SpamEmoteNextTime)
+		return;
+
+	int Emote = g_Config.m_TcSpamEmoteId - 1;
+	if(Emote < 0)
+	{
+		m_SpamEmoteIndex = (m_SpamEmoteIndex + 1) % NUM_EMOTICONS;
+		Emote = m_SpamEmoteIndex;
+	}
+	Emote = std::clamp(Emote, 0, (int)NUM_EMOTICONS - 1);
+
+	GameClient()->m_Emoticon.Emote(Emote);
+	m_SpamEmoteNextTime = Now + time_freq() * g_Config.m_TcSpamEmoteInterval / 1000;
 }
 
 bool CTClient::NeedUpdate()

@@ -28,6 +28,10 @@ class CTClient : public CComponent
 	void SpecId(int ClientId);
 
 	int m_EmoteCycle = 0;
+
+	int64_t m_SpamEmoteNextTime = 0;
+	int m_SpamEmoteIndex = 0;
+	void DoSpamEmote();
 	static void ConEmoteCycle(IConsole::IResult *pResult, void *pUserData);
 
 	class IEngineGraphics *m_pGraphics = nullptr;
