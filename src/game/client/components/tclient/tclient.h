@@ -38,7 +38,6 @@ class CTClient : public CComponent
 	// Melancholy: auto message
 	int64_t m_AutoMessageNextTime = 0;
 	void DoAutoMessage();
-	void SendAutoMessageNow();
 
 	// Melancholy: fake aim
 	float m_FakeAimAngle = 0.0f;
@@ -58,6 +57,7 @@ class CTClient : public CComponent
 	bool ServerCommandExists(const char *pCommand);
 
 public:
+	void SendAutoMessageNow();
 	CTClient();
 	int Sizeof() const override { return sizeof(*this); }
 	void OnInit() override;

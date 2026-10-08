@@ -2029,7 +2029,7 @@ void CMenus::RenderSettingsTClientMisc(CUIRect MainView)
 	if(DoButton_Menu(&s_SendNowButton, TCLocalize("Send now"), 0, &Button))
 		GameClient()->m_TClient.SendAutoMessageNow();
 
-	LeftView.HSplitTop(MarginMedium, nullptr, &LeftView);
+	LeftView.HSplitTop(MarginLarge, nullptr, &LeftView);
 	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
 	Ui()->DoLabel(&Label, TCLocalize("Fake Aim"), HeadlineFontSize, TEXTALIGN_ML);
 	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
