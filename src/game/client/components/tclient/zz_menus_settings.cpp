@@ -500,6 +500,53 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 
 		{
 			CUIRect Inner;
+			DoFeaturePanel(LeftView, 220.0f, Localize("Auto Message"), Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoMessage, Localize("Enable auto message"), &g_Config.m_TcAutoMessage, &Inner, LineSize);
+			char aMsgSuffix[32];
+			str_format(aMsgSuffix, sizeof(aMsgSuffix), " %s", Localize("sec"));
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_TcAutoMessageInterval, &g_Config.m_TcAutoMessageInterval, &Button, Localize("Interval"), 10, 3600, &CUi::ms_LogarithmicScrollbarScale, 0, aMsgSuffix);
+			Inner.HSplitTop(LineSize, &Label, &Inner);
+			Ui()->DoLabel(&Label, Localize("Message"), 14.0f, TEXTALIGN_ML);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			static CLineInput s_AutoMessageInput(g_Config.m_TcAutoMessageText, sizeof(g_Config.m_TcAutoMessageText));
+			Ui()->DoEditBox(&s_AutoMessageInput, &Button, 14.0f);
+			Inner.HSplitTop(8.0f, nullptr, &Inner);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			static CButtonContainer s_SendNowButton;
+			if(DoButton_Menu(&s_SendNowButton, Localize("Send now"), 0, &Button))
+				GameClient()->m_TClient.SendAutoMessageNow();
+		}
+
+		{
+			CUIRect Inner;
+			DoFeaturePanel(LeftView, 180.0f, Localize("Spam Emote"), Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcSpamEmote, Localize("Spam Emote"), &g_Config.m_TcSpamEmote, &Inner, LineSize);
+			{
+				static std::vector<const char *> s_vModeNames;
+				s_vModeNames = {Localize("All emotes in order"), Localize("Random emotes"), Localize("Single emote")};
+				static CUi::SDropDownState s_ModeDropDownState;
+				static CScrollRegion s_ModeDropDownScrollRegion;
+				s_ModeDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_ModeDropDownScrollRegion;
+				CUIRect DropDownRect;
+				Inner.HSplitTop(LineSize, &DropDownRect, &Inner);
+				DropDownRect.VSplitLeft(120.0f, &Label, &DropDownRect);
+				Ui()->DoLabel(&Label, Localize("Mode"), 14.0f, TEXTALIGN_ML);
+				g_Config.m_TcSpamEmoteMode = Ui()->DoDropDown(&DropDownRect, g_Config.m_TcSpamEmoteMode, s_vModeNames.data(), s_vModeNames.size(), s_ModeDropDownState);
+			}
+			if(g_Config.m_TcSpamEmoteMode == 2)
+			{
+				Inner.HSplitTop(LineSize, &Button, &Inner);
+				Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, Localize("Emote"), 1, 16);
+			}
+			char aSpamSuffix[32];
+			str_format(aSpamSuffix, sizeof(aSpamSuffix), " %s", Localize("ms"));
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteInterval, &g_Config.m_TcSpamEmoteInterval, &Button, Localize("Delay"), 50, 5000, &CUi::ms_LogarithmicScrollbarScale, 0, aSpamSuffix);
+		}
+
+		{
+			CUIRect Inner;
 			DoFeaturePanel(RightView, 95.0f, Localize("Click GUI"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_ClZzClickGui, Localize("Show ClickGUI"),

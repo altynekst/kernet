@@ -4,7 +4,6 @@
 
 #include <base/log.h>
 #include <base/secure.h>
-#include <game/client/components/controls.h>
 
 #include <engine/client.h>
 #include <engine/client/enums.h>
@@ -570,7 +569,6 @@ void CTClient::OnRender()
 	DoFinishCheck();
 	DoSpamEmote();
 	DoAutoMessage();
-	DoFakeAim();
 }
 
 void CTClient::DoSpamEmote()
@@ -645,56 +643,6 @@ void CTClient::SendAutoMessageNow()
 	m_AutoMessageNextTime = 0;
 }
 
-void CTClient::DoFakeAim()
-{
-	if(!g_Config.m_TcFakeAim)
-	{
-		m_FakeAimAngle = 0.0f;
-		m_FakeAimCurSpeed = 1.0f;
-		return;
-	}
-	if(Client()->State() != IClient::STATE_ONLINE || GameClient()->m_Snap.m_LocalClientId < 0)
-		return;
-
-	// во время хука — пауза, если галочка снята
-	const int Dummy = g_Config.m_ClDummy;
-	CNetObj_PlayerInput *pInput = &GameClient()->m_Controls.m_aInputData[Dummy];
-
-	// во время хука — пауза, если галочка снята
-	if(!g_Config.m_TcFakeAimOnHook && pInput->m_Hook)
-		return;
-
-
-	const float MaxSpeed = (float)std::clamp(g_Config.m_TcFakeAimSpeed, 1, 75);
-
-	if(g_Config.m_TcFakeAimGrowth)
-	{
-		m_FakeAimCurSpeed += 0.05f;
-		if(m_FakeAimCurSpeed > MaxSpeed)
-			m_FakeAimCurSpeed = MaxSpeed;
-	}
-	else
-	{
-		m_FakeAimCurSpeed = MaxSpeed;
-	}
-
-	if(g_Config.m_TcFakeAimRandom)
-	{
-		m_FakeAimAngle = (float)secure_rand_below(360) * 3.14159265f / 180.0f;
-	}
-	else
-	{
-		m_FakeAimAngle += m_FakeAimCurSpeed * 3.14159265f / 180.0f;
-		if(m_FakeAimAngle > 2.0f * 3.14159265f)
-			m_FakeAimAngle -= 2.0f * 3.14159265f;
-	}
-
-	const int Radius = 100;
-	pInput->m_TargetX = (int)(cosf(m_FakeAimAngle) * (float)Radius);
-	pInput->m_TargetY = (int)(sinf(m_FakeAimAngle) * (float)Radius);
-	if(!pInput->m_TargetX && !pInput->m_TargetY)
-		pInput->m_TargetY = -1;
-}
 
 bool CTClient::NeedUpdate()
 {

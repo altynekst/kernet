@@ -44,8 +44,6 @@ enum
 	TCLIENT_TAB_BINDCHAT,
 	TCLIENT_TAB_STATUSBAR,
 	TCLIENT_TAB_INFO,
-	TCLIENT_TAB_MISC,
-	TCLIENT_TAB_TROLL,
 	NUMBER_OF_TCLIENT_TABS
 };
 
@@ -346,8 +344,7 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		TCLocalize("Chat Binds"),
 		TCLocalize("Status Bar"),
 		TCLocalize("Info"),
-		TCLocalize("Misc"),
-		TCLocalize("Troll")};
+};
 
 	for(int Tab = 0; Tab < NUMBER_OF_TCLIENT_TABS; ++Tab)
 	{
@@ -375,10 +372,6 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		RenderSettingsTClientStatusBar(MainView);
 	if(s_CurCustomTab == TCLIENT_TAB_INFO)
 		RenderSettingsTClientInfo(MainView);
-	if(s_CurCustomTab == TCLIENT_TAB_MISC)
-		RenderSettingsTClientMisc(MainView);
-	if(s_CurCustomTab == TCLIENT_TAB_TROLL)
-		RenderSettingsTClientTroll(MainView);
 }
 
 void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
@@ -1996,105 +1989,7 @@ void CMenus::RenderSettingsTClientStatusBar(CUIRect MainView)
 		s_SelectedItem = std::max(-1, s_SelectedItem);
 }
 
-void CMenus::RenderSettingsTClientMisc(CUIRect MainView)
-{
-	CUIRect LeftView, RightView, Button, Label, Box;
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
 
-	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
-	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
-	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Auto Message"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoMessage, TCLocalize("Enable auto message"), &g_Config.m_TcAutoMessage, &LeftView, LineSize);
-
-	char aSuffix[32];
-	str_format(aSuffix, sizeof(aSuffix), " %s", TCLocalize("sec", "melancholy interval unit"));
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcAutoMessageInterval, &g_Config.m_TcAutoMessageInterval, &Button, TCLocalize("Interval"), 10, 3600, &CUi::ms_LogarithmicScrollbarScale, 0, aSuffix);
-
-	LeftView.HSplitTop(MarginExtraSmall, nullptr, &LeftView);
-	LeftView.HSplitTop(LineSize + MarginExtraSmall, &Box, &LeftView);
-	Box.VSplitMid(&Label, &Button);
-	Ui()->DoLabel(&Label, TCLocalize("Message"), FontSize, TEXTALIGN_ML);
-	static CLineInput s_AutoMessageInput(g_Config.m_TcAutoMessageText, sizeof(g_Config.m_TcAutoMessageText));
-	Ui()->DoEditBox(&s_AutoMessageInput, &Button, EditBoxFontSize);
-
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	static CButtonContainer s_SendNowButton;
-	if(DoButton_Menu(&s_SendNowButton, TCLocalize("Send now"), 0, &Button))
-		GameClient()->m_TClient.SendAutoMessageNow();
-
-	LeftView.HSplitTop(Margin, nullptr, &LeftView);
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Fake Aim"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAim, TCLocalize("Fake Aim (visible to others)"), &g_Config.m_TcFakeAim, &LeftView, LineSize);
-
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcFakeAimSpeed, &g_Config.m_TcFakeAimSpeed, &Button, TCLocalize("Max spin speed"), 1, 75, &CUi::ms_LinearScrollbarScale, 0, "");
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAimGrowth, TCLocalize("Grow speed from 1 to max"), &g_Config.m_TcFakeAimGrowth, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAimRandom, TCLocalize("Random direction"), &g_Config.m_TcFakeAimRandom, &LeftView, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAimOnHook, TCLocalize("Spin while hooked"), &g_Config.m_TcFakeAimOnHook, &LeftView, LineSize);
-
-	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Notes"), HeadlineFontSize, TEXTALIGN_ML);
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	RightView.HSplitTop(LineSize * 8.0f, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Fake Aim spins your aim angle so other players see you constantly rotating. Speed is in degrees per tick (max 75). If Grow is on, speed rises from 1 to max while enabled. Random mode picks a fresh random direction every tick. Notes: on some servers this may look suspicious."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
-}
-
-void CMenus::RenderSettingsTClientTroll(CUIRect MainView)
-{
-	CUIRect LeftView, RightView, Button, Label;
-	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
-
-	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
-	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
-	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
-
-	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
-	Ui()->DoLabel(&Label, TCLocalize("Spam Emote"), HeadlineFontSize, TEXTALIGN_ML);
-	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
-
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcSpamEmote, TCLocalize("Spam Emote"), &g_Config.m_TcSpamEmote, &LeftView, LineSize);
-
-	{
-		static std::vector<const char *> s_vModeNames;
-		s_vModeNames = {TCLocalize("All emotes in order"), TCLocalize("Random emotes"), TCLocalize("Single emote")};
-		static CUi::SDropDownState s_ModeDropDownState;
-		static CScrollRegion s_ModeDropDownScrollRegion;
-		s_ModeDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_ModeDropDownScrollRegion;
-		CUIRect DropDownRect;
-		LeftView.HSplitTop(LineSize, &DropDownRect, &LeftView);
-		DropDownRect.VSplitLeft(120.0f, &Label, &DropDownRect);
-		Ui()->DoLabel(&Label, TCLocalize("Mode"), FontSize, TEXTALIGN_ML);
-		g_Config.m_TcSpamEmoteMode = Ui()->DoDropDown(&DropDownRect, g_Config.m_TcSpamEmoteMode, s_vModeNames.data(), s_vModeNames.size(), s_ModeDropDownState);
-	}
-
-	if(g_Config.m_TcSpamEmoteMode == 2)
-	{
-		LeftView.HSplitTop(LineSize, &Button, &LeftView);
-		Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, TCLocalize("Emote"), 1, 16, &CUi::ms_LinearScrollbarScale, 0, "");
-	}
-
-	char aSuffix[32];
-	str_format(aSuffix, sizeof(aSuffix), " %s", TCLocalize("ms", "melancholy delay unit"));
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteInterval, &g_Config.m_TcSpamEmoteInterval, &Button, TCLocalize("Delay"), 50, 5000, &CUi::ms_LogarithmicScrollbarScale, 0, aSuffix);
-
-	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Notes"), HeadlineFontSize, TEXTALIGN_ML);
-	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	RightView.HSplitTop(LineSize * 6.0f, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("The server decides how fast emotes are accepted (sv_emoticon_delay, 3 seconds by default). A shorter delay only helps on servers that allow frequent emotes. Always starts disabled when the client launches."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
-}
 
 void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 {
@@ -2256,8 +2151,7 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 		TCLocalize("Chat Binds"),
 		TCLocalize("Status Bar"),
 		TCLocalize("Info"),
-		TCLocalize("Misc"),
-		TCLocalize("Troll")};
+};
 	static int s_aShowTabs[NUMBER_OF_TCLIENT_TABS] = {};
 	static bool s_TabsInitialized = false;
 	if(!s_TabsInitialized)

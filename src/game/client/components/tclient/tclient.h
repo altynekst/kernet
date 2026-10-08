@@ -39,10 +39,6 @@ class CTClient : public CComponent
 	int64_t m_AutoMessageNextTime = 0;
 	void DoAutoMessage();
 
-	// Melancholy: fake aim
-	float m_FakeAimAngle = 0.0f;
-	float m_FakeAimCurSpeed = 1.0f;
-	void DoFakeAim();
 	static void ConEmoteCycle(IConsole::IResult *pResult, void *pUserData);
 
 	class IEngineGraphics *m_pGraphics = nullptr;

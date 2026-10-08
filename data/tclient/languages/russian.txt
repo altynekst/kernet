@@ -927,27 +927,6 @@ Troll
 Notes
 == Заметки
 
-Fake Aim
-== Фейк-аим
-
-Fake Aim (visible to others)
-== Фейк-аим (видят другие)
-
-Max spin speed
-== Макс. скорость вращения
-
-Grow speed from 1 to max
-== Нарастание скорости с 1 до макс.
-
-Random direction
-== Случайное направление
-
-Spin while hooked
-== Крутить во время хука
-
-Fake Aim spins your aim angle so other players see you constantly rotating. Speed is in degrees per tick (max 75). If Grow is on, speed rises from 1 to max while enabled. Random mode picks a fresh random direction every tick. Notes: on some servers this may look suspicious.
-== Фейк-аим крутит угол прицела, чтобы другие игроки видели, как ты постоянно вращаешься. Скорость в градусах за тик (макс. 75). Если включено нарастание, скорость растёт от 1 до максимума. Режим «случайное направление» выбирает новый угол каждый тик. Примечание: на некоторых серверах это может выглядеть подозрительно.
-
 The server decides how fast emotes are accepted (sv_emoticon_delay, 3 seconds by default). A shorter delay only helps on servers that allow frequent emotes. Always starts disabled when the client launches.
 == Скорость приёма эмоций определяет сервер (sv_emoticon_delay, по умолчанию 3 секунды). Короткая задержка помогает только на серверах, где разрешены частые эмоции. При каждом запуске клиента выключено.
 
@@ -961,4 +940,10 @@ ms
 [melancholy interval unit]
 sec
 == сек
+
+sec
+== сек
+
+ms
+== мс
 
