@@ -2677,7 +2677,7 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 		RightRow.VSplitLeft(RightInset, nullptr, &RightRow);
 		CUIRect TopCol1, TopCol2;
 		RightRow.VSplitMid(&TopCol1, &TopCol2, 0.0f);
-		if(DoButton_CheckBox(&g_Config.m_TcUiShowTClient, Localize("Melancholy"), g_Config.m_TcUiShowTClient, &TopCol1))
+		if(DoButton_CheckBox(&g_Config.m_TcUiShowTClient, Localize("TClient"), g_Config.m_TcUiShowTClient, &TopCol1))
 			g_Config.m_TcUiShowTClient ^= 1;
 		if(DoButton_CheckBox(&g_Config.m_TcUiCompactList, Localize("Compact List"), g_Config.m_TcUiCompactList, &TopCol2))
 			g_Config.m_TcUiCompactList ^= 1;

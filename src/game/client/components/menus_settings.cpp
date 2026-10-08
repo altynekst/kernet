@@ -1861,7 +1861,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Assets"),
 		Localize("Melancholy"),
 		Localize("Profiles"),
-		Localize("KernelNet"),
+		Localize("Melancholy"),
 	};
 	static CButtonContainer s_aTabButtons[(int)std::size(s_aMainPages)];
 	bool MainPageSelected = false;
