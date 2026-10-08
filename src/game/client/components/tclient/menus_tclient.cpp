@@ -2029,11 +2029,25 @@ void CMenus::RenderSettingsTClientMisc(CUIRect MainView)
 	if(DoButton_Menu(&s_SendNowButton, TCLocalize("Send now"), 0, &Button))
 		GameClient()->m_TClient.SendAutoMessageNow();
 
+	LeftView.HSplitTop(MarginMedium, nullptr, &LeftView);
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Fake Aim"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAim, TCLocalize("Fake Aim (visible to others)"), &g_Config.m_TcFakeAim, &LeftView, LineSize);
+
+	LeftView.HSplitTop(LineSize, &Button, &LeftView);
+	Ui()->DoScrollbarOption(&g_Config.m_TcFakeAimSpeed, &g_Config.m_TcFakeAimSpeed, &Button, TCLocalize("Max spin speed"), 1, 75, &CUi::ms_LinearScrollbarScale, 0, "");
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAimGrowth, TCLocalize("Grow speed from 1 to max"), &g_Config.m_TcFakeAimGrowth, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAimRandom, TCLocalize("Random direction"), &g_Config.m_TcFakeAimRandom, &LeftView, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFakeAimOnHook, TCLocalize("Spin while hooked"), &g_Config.m_TcFakeAimOnHook, &LeftView, LineSize);
+
 	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
 	Ui()->DoLabel(&Label, TCLocalize("Notes"), HeadlineFontSize, TEXTALIGN_ML);
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	RightView.HSplitTop(LineSize * 6.0f, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("Sends the message to chat every chosen interval while you are connected to a server. Always starts disabled when the client launches. The minimum interval is 10 seconds to avoid chat flooding."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
+	RightView.HSplitTop(LineSize * 8.0f, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Fake Aim spins your aim angle so other players see you constantly rotating. Speed is in degrees per tick (max 75). If Grow is on, speed rises from 1 to max while enabled. Random mode picks a fresh random direction every tick. Notes: on some servers this may look suspicious."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
 }
 
 void CMenus::RenderSettingsTClientTroll(CUIRect MainView)

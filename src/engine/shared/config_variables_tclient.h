@@ -250,14 +250,21 @@ MACRO_CONFIG_INT(TcPetAlpha, tc_pet_alpha, 90, 10, 100, CFGFLAG_CLIENT | CFGFLAG
 MACRO_CONFIG_INT(TcChangeNameNearFinish, tc_change_name_near_finish, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Attempt to change your name when near finish")
 MACRO_CONFIG_STR(TcFinishName, tc_finish_name, 16, "nameless tee", CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_INSENSITIVE, "Name to change to when near finish when tc_change_name_near_finish is 1")
 
-// Melancholy
+// Melancholy: spam emote
 MACRO_CONFIG_INT(TcSpamEmote, tc_spam_emote, 0, 0, 1, CFGFLAG_CLIENT, "Continuously send emotes (not saved, always starts disabled)")
-MACRO_CONFIG_INT(TcSpamEmoteMode, tc_spam_emote_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spam emote mode (0 = all emotes in order, 1 = random, 2 = single emote)")
-MACRO_CONFIG_INT(TcSpamEmoteId, tc_spam_emote_id, 1, 1, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Emote number used by the single emote mode (1-16)")
-MACRO_CONFIG_INT(TcSpamEmoteInterval, tc_spam_emote_interval, 500, 50, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay between spammed emotes in milliseconds")
+MACRO_CONFIG_INT(TcSpamEmoteMode, tc_spam_emote_mode, 0, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spam emote mode (0 = all in order, 1 = random, 2 = single)")
+MACRO_CONFIG_INT(TcSpamEmoteId, tc_spam_emote_id, 1, 1, 16, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Emote number (single mode)")
+MACRO_CONFIG_INT(TcSpamEmoteInterval, tc_spam_emote_interval, 500, 50, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay between emotes in ms")
+// Melancholy: auto message
 MACRO_CONFIG_INT(TcAutoMessage, tc_auto_message, 0, 0, 1, CFGFLAG_CLIENT, "Periodically send a chat message (not saved, always starts disabled)")
-MACRO_CONFIG_INT(TcAutoMessageInterval, tc_auto_message_interval, 60, 10, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Seconds between automatic chat messages")
-MACRO_CONFIG_STR(TcAutoMessageText, tc_auto_message_text, 200, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Text of the automatic chat message")
+MACRO_CONFIG_INT(TcAutoMessageInterval, tc_auto_message_interval, 60, 10, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Seconds between automatic messages")
+MACRO_CONFIG_STR(TcAutoMessageText, tc_auto_message_text, 200, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Text of the automatic message")
+// Melancholy: fake aim (spin the aim so others see it)
+MACRO_CONFIG_INT(TcFakeAim, tc_fake_aim, 0, 0, 1, CFGFLAG_CLIENT, "Spin the aim so other players see it")
+MACRO_CONFIG_INT(TcFakeAimSpeed, tc_fake_aim_speed, 30, 1, 75, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake aim max spin speed (degrees per tick, 1-75)")
+MACRO_CONFIG_INT(TcFakeAimGrowth, tc_fake_aim_growth, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake aim: speed grows from 1 to max while enabled")
+MACRO_CONFIG_INT(TcFakeAimRandom, tc_fake_aim_random, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake aim: random direction each tick")
+MACRO_CONFIG_INT(TcFakeAimOnHook, tc_fake_aim_on_hook, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake aim: keep spinning while hooked")
 
 // Flags
 MACRO_CONFIG_INT(TcTClientSettingsTabs, tc_tclient_settings_tabs, 0, 0, 65536, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bit flags to disable settings tabs")

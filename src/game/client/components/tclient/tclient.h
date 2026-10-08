@@ -38,6 +38,12 @@ class CTClient : public CComponent
 	// Melancholy: auto message
 	int64_t m_AutoMessageNextTime = 0;
 	void DoAutoMessage();
+	void SendAutoMessageNow();
+
+	// Melancholy: fake aim
+	float m_FakeAimAngle = 0.0f;
+	float m_FakeAimCurSpeed = 1.0f;
+	void DoFakeAim();
 	static void ConEmoteCycle(IConsole::IResult *pResult, void *pUserData);
 
 	class IEngineGraphics *m_pGraphics = nullptr;
@@ -58,7 +64,6 @@ public:
 	void OnMessage(int MsgType, void *pRawMsg) override;
 	void OnConsoleInit() override;
 	void OnRender() override;
-	void SendAutoMessageNow();
 
 	void OnStateChange(int OldState, int NewState) override;
 	void OnNewSnapshot() override;

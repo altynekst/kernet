@@ -4,6 +4,7 @@
 
 #include <base/log.h>
 #include <base/secure.h>
+#include <game/client/components/controls.h>
 
 #include <engine/client.h>
 #include <engine/client/enums.h>
@@ -569,6 +570,7 @@ void CTClient::OnRender()
 	DoFinishCheck();
 	DoSpamEmote();
 	DoAutoMessage();
+	DoFakeAim();
 }
 
 void CTClient::DoSpamEmote()
@@ -589,15 +591,15 @@ void CTClient::DoSpamEmote()
 	int Emote;
 	switch(g_Config.m_TcSpamEmoteMode)
 	{
-	case 1: // random, never the same emote twice in a row
+	case 1:
 		Emote = secure_rand_below(NUM_EMOTICONS - 1);
 		if(m_SpamEmoteLast >= 0 && Emote >= m_SpamEmoteLast)
 			Emote++;
 		break;
-	case 2: // single emote
+	case 2:
 		Emote = g_Config.m_TcSpamEmoteId - 1;
 		break;
-	default: // all emotes in order
+	default:
 		m_SpamEmoteIndex = (m_SpamEmoteIndex + 1) % NUM_EMOTICONS;
 		Emote = m_SpamEmoteIndex;
 		break;
@@ -607,7 +609,6 @@ void CTClient::DoSpamEmote()
 	GameClient()->m_Emoticon.Emote(Emote);
 	m_SpamEmoteLast = Emote;
 
-	// the next emote is scheduled from now, so a lag spike never causes a burst of emotes
 	const int Interval = std::clamp(g_Config.m_TcSpamEmoteInterval, 50, 5000);
 	m_SpamEmoteNextTime = Now + time_freq() * Interval / 1000;
 }
@@ -642,6 +643,55 @@ void CTClient::SendAutoMessageNow()
 		return;
 	GameClient()->m_Chat.SendChat(0, g_Config.m_TcAutoMessageText);
 	m_AutoMessageNextTime = 0;
+}
+
+void CTClient::DoFakeAim()
+{
+	if(!g_Config.m_TcFakeAim)
+	{
+		m_FakeAimAngle = 0.0f;
+		m_FakeAimCurSpeed = 1.0f;
+		return;
+	}
+	if(Client()->State() != IClient::STATE_ONLINE || GameClient()->m_Snap.m_LocalClientId < 0)
+		return;
+
+	// во время хука — пауза, если галочка снята
+	if(!g_Config.m_TcFakeAimOnHook && GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_HookState > 0)
+		return;
+
+	const int Dummy = g_Config.m_ClDummy;
+	CNetObj_PlayerInput *pInput = &GameClient()->m_Controls.m_aInputData[Dummy];
+
+	const float MaxSpeed = (float)std::clamp(g_Config.m_TcFakeAimSpeed, 1, 75);
+
+	if(g_Config.m_TcFakeAimGrowth)
+	{
+		m_FakeAimCurSpeed += 0.05f;
+		if(m_FakeAimCurSpeed > MaxSpeed)
+			m_FakeAimCurSpeed = MaxSpeed;
+	}
+	else
+	{
+		m_FakeAimCurSpeed = MaxSpeed;
+	}
+
+	if(g_Config.m_TcFakeAimRandom)
+	{
+		m_FakeAimAngle = (float)secure_rand_below(360) * 3.14159265f / 180.0f;
+	}
+	else
+	{
+		m_FakeAimAngle += m_FakeAimCurSpeed * 3.14159265f / 180.0f;
+		if(m_FakeAimAngle > 2.0f * 3.14159265f)
+			m_FakeAimAngle -= 2.0f * 3.14159265f;
+	}
+
+	const int Radius = 100;
+	pInput->m_TargetX = (int)(cosf(m_FakeAimAngle) * (float)Radius);
+	pInput->m_TargetY = (int)(sinf(m_FakeAimAngle) * (float)Radius);
+	if(!pInput->m_TargetX && !pInput->m_TargetY)
+		pInput->m_TargetY = -1;
 }
 
 bool CTClient::NeedUpdate()
