@@ -657,11 +657,13 @@ void CTClient::DoFakeAim()
 		return;
 
 	// во время хука — пауза, если галочка снята
-	if(!g_Config.m_TcFakeAimOnHook && GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_HookState > 0)
-		return;
-
 	const int Dummy = g_Config.m_ClDummy;
 	CNetObj_PlayerInput *pInput = &GameClient()->m_Controls.m_aInputData[Dummy];
+
+	// во время хука — пауза, если галочка снята
+	if(!g_Config.m_TcFakeAimOnHook && pInput->m_Hook)
+		return;
+
 
 	const float MaxSpeed = (float)std::clamp(g_Config.m_TcFakeAimSpeed, 1, 75);
 
