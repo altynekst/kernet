@@ -190,8 +190,8 @@ static const char *FoxSkipDecor(const char *pVote)
 		pVote++;
 	if(str_startswith(pVote, "│ "))
 		pVote += 3;
-	else if(*pVote == '│')
-		pVote++;
+	else if(str_startswith(pVote, "│"))
+		pVote += 3;
 	while(*pVote == ' ')
 		pVote++;
 	return pVote;
