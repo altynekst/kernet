@@ -26,8 +26,9 @@ jobs:
 
       - name: Fix line endings
         run: |
-          find scripts -type f \( -name '*.sh' -o -name 'gradlew' \) -exec sed -i 's/\r$//' {} +
+          find scripts -type f \( -name '*.sh' -o -name 'gradlew' -o -name '*.gradle' -o -name '*.properties' -o -name '*.pro' \) -exec sed -i 's/\r$//' {} +
           find scripts -type f \( -name '*.sh' -o -name 'gradlew' \) -exec chmod +x {} +
+          sed -i 's/\r$//' src/game/version.h
 
       - name: Add prebuilt Android libraries
         run: |
@@ -71,9 +72,12 @@ jobs:
           TW_KEY_NAME: /home/runner/App.jks
           TW_KEY_ALIAS: App-Key
         run: |
-          export TW_KEY_PW="$(openssl rand -base64 32)"
+          export TW_KEY_PW="$(openssl rand -hex 16)"
           keytool -genkey -v -keystore "$TW_KEY_NAME" -keyalg RSA -keysize 2048 -validity 10000 \
             -alias "$TW_KEY_ALIAS" -storepass "$TW_KEY_PW" -dname "CN=Client, OU=Client, O=Client"
+          export TW_VERSION_CODE="$(grep '#define DDNET_VERSION_NUMBER' src/game/version.h | awk '{print $3}' | tr -d '\r')"
+          export TW_VERSION_NAME="$(grep '#define GAME_RELEASE_VERSION_INTERNAL' src/game/version.h | awk '{print $3}' | tr -d '\r')"
+          echo "version: $TW_VERSION_NAME ($TW_VERSION_CODE)"
           export ANDROID_HOME="/home/runner/Android/Sdk"
           unset ANDROID_SDK_ROOT
           export PATH=/home/runner/cmake/bin:$PATH
