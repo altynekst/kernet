@@ -3,6 +3,7 @@
 #include "data_version.h"
 
 #include <base/log.h>
+#include <base/secure.h>
 
 #include <engine/client.h>
 #include <engine/client/enums.h>
@@ -567,6 +568,7 @@ void CTClient::OnRender()
 
 	DoFinishCheck();
 	DoSpamEmote();
+	DoAutoMessage();
 }
 
 void CTClient::DoSpamEmote()
@@ -574,6 +576,7 @@ void CTClient::DoSpamEmote()
 	if(!g_Config.m_TcSpamEmote)
 	{
 		m_SpamEmoteNextTime = 0;
+		m_SpamEmoteLast = -1;
 		return;
 	}
 	if(Client()->State() != IClient::STATE_ONLINE || GameClient()->m_Snap.m_LocalClientId < 0)
@@ -583,16 +586,62 @@ void CTClient::DoSpamEmote()
 	if(Now < m_SpamEmoteNextTime)
 		return;
 
-	int Emote = g_Config.m_TcSpamEmoteId - 1;
-	if(Emote < 0)
+	int Emote;
+	switch(g_Config.m_TcSpamEmoteMode)
 	{
+	case 1: // random, never the same emote twice in a row
+		Emote = secure_rand_below(NUM_EMOTICONS - 1);
+		if(m_SpamEmoteLast >= 0 && Emote >= m_SpamEmoteLast)
+			Emote++;
+		break;
+	case 2: // single emote
+		Emote = g_Config.m_TcSpamEmoteId - 1;
+		break;
+	default: // all emotes in order
 		m_SpamEmoteIndex = (m_SpamEmoteIndex + 1) % NUM_EMOTICONS;
 		Emote = m_SpamEmoteIndex;
+		break;
 	}
 	Emote = std::clamp(Emote, 0, (int)NUM_EMOTICONS - 1);
 
 	GameClient()->m_Emoticon.Emote(Emote);
-	m_SpamEmoteNextTime = Now + time_freq() * g_Config.m_TcSpamEmoteInterval / 1000;
+	m_SpamEmoteLast = Emote;
+
+	// the next emote is scheduled from now, so a lag spike never causes a burst of emotes
+	const int Interval = std::clamp(g_Config.m_TcSpamEmoteInterval, 50, 5000);
+	m_SpamEmoteNextTime = Now + time_freq() * Interval / 1000;
+}
+
+void CTClient::DoAutoMessage()
+{
+	if(!g_Config.m_TcAutoMessage || Client()->State() != IClient::STATE_ONLINE || GameClient()->m_Snap.m_LocalClientId < 0)
+	{
+		m_AutoMessageNextTime = 0;
+		return;
+	}
+	if(g_Config.m_TcAutoMessageText[0] == '\0')
+		return;
+
+	const int64_t Now = time_get();
+	const int Interval = std::clamp(g_Config.m_TcAutoMessageInterval, 10, 3600);
+	if(m_AutoMessageNextTime == 0)
+	{
+		m_AutoMessageNextTime = Now + time_freq() * Interval;
+		return;
+	}
+	if(Now < m_AutoMessageNextTime)
+		return;
+
+	GameClient()->m_Chat.SendChat(0, g_Config.m_TcAutoMessageText);
+	m_AutoMessageNextTime = Now + time_freq() * Interval;
+}
+
+void CTClient::SendAutoMessageNow()
+{
+	if(Client()->State() != IClient::STATE_ONLINE || g_Config.m_TcAutoMessageText[0] == '\0')
+		return;
+	GameClient()->m_Chat.SendChat(0, g_Config.m_TcAutoMessageText);
+	m_AutoMessageNextTime = 0;
 }
 
 bool CTClient::NeedUpdate()

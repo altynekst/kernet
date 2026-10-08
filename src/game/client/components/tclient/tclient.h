@@ -29,9 +29,15 @@ class CTClient : public CComponent
 
 	int m_EmoteCycle = 0;
 
+	// Melancholy: spam emote
 	int64_t m_SpamEmoteNextTime = 0;
-	int m_SpamEmoteIndex = 0;
+	int m_SpamEmoteIndex = -1;
+	int m_SpamEmoteLast = -1;
 	void DoSpamEmote();
+
+	// Melancholy: auto message
+	int64_t m_AutoMessageNextTime = 0;
+	void DoAutoMessage();
 	static void ConEmoteCycle(IConsole::IResult *pResult, void *pUserData);
 
 	class IEngineGraphics *m_pGraphics = nullptr;
@@ -52,6 +58,7 @@ public:
 	void OnMessage(int MsgType, void *pRawMsg) override;
 	void OnConsoleInit() override;
 	void OnRender() override;
+	void SendAutoMessageNow();
 
 	void OnStateChange(int OldState, int NewState) override;
 	void OnNewSnapshot() override;

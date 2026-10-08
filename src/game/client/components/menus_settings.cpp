@@ -1859,7 +1859,7 @@ void CMenus::RenderSettings(CUIRect MainView)
 		Localize("Sound"),
 		Localize("DDNet"),
 		Localize("Assets"),
-		Localize("TClient"),
+		Localize("Melancholy"),
 		Localize("Profiles"),
 		Localize("KernelNet"),
 	};

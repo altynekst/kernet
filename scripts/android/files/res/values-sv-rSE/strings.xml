@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-	<string name="app_name">DDNet</string>
+	<string name="app_name">Melancholy</string>
 	<string name="shortcut_play_vulkan_short">Öppna (Vulkan)</string>
 	<string name="shortcut_play_gles_short">Öppna (OpenGL ES)</string>
 	<string name="server_name">DDNet-Server</string>

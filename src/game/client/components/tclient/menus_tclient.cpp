@@ -43,8 +43,9 @@ enum
 	TCLIENT_TAB_WARLIST,
 	TCLIENT_TAB_BINDCHAT,
 	TCLIENT_TAB_STATUSBAR,
-	TCLIENT_TAB_TROLL,
 	TCLIENT_TAB_INFO,
+	TCLIENT_TAB_MISC,
+	TCLIENT_TAB_TROLL,
 	NUMBER_OF_TCLIENT_TABS
 };
 
@@ -332,6 +333,8 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 				s_CurCustomTab++;
 		}
 	}
+	if(s_CurCustomTab >= NUMBER_OF_TCLIENT_TABS)
+		s_CurCustomTab = TCLIENT_TAB_INFO;
 
 	MainView.HSplitTop(LineSize, &TabBar, &MainView);
 	const float TabWidth = TabBar.w / TabCount;
@@ -342,8 +345,9 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		TCLocalize("War List"),
 		TCLocalize("Chat Binds"),
 		TCLocalize("Status Bar"),
-		TCLocalize("Troll"),
-		TCLocalize("Info")};
+		TCLocalize("Info"),
+		TCLocalize("Misc"),
+		TCLocalize("Troll")};
 
 	for(int Tab = 0; Tab < NUMBER_OF_TCLIENT_TABS; ++Tab)
 	{
@@ -369,10 +373,12 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 		RenderSettingsTClientWarList(MainView);
 	if(s_CurCustomTab == TCLIENT_TAB_STATUSBAR)
 		RenderSettingsTClientStatusBar(MainView);
-	if(s_CurCustomTab == TCLIENT_TAB_TROLL)
-		RenderSettingsTClientTroll(MainView);
 	if(s_CurCustomTab == TCLIENT_TAB_INFO)
 		RenderSettingsTClientInfo(MainView);
+	if(s_CurCustomTab == TCLIENT_TAB_MISC)
+		RenderSettingsTClientMisc(MainView);
+	if(s_CurCustomTab == TCLIENT_TAB_TROLL)
+		RenderSettingsTClientTroll(MainView);
 }
 
 void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
@@ -1990,6 +1996,46 @@ void CMenus::RenderSettingsTClientStatusBar(CUIRect MainView)
 		s_SelectedItem = std::max(-1, s_SelectedItem);
 }
 
+void CMenus::RenderSettingsTClientMisc(CUIRect MainView)
+{
+	CUIRect LeftView, RightView, Button, Label, Box;
+	MainView.HSplitTop(MarginSmall, nullptr, &MainView);
+
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
+	LeftView.VSplitLeft(MarginSmall, nullptr, &LeftView);
+	RightView.VSplitRight(MarginSmall, &RightView, nullptr);
+
+	LeftView.HSplitTop(HeadlineHeight, &Label, &LeftView);
+	Ui()->DoLabel(&Label, TCLocalize("Auto Message"), HeadlineFontSize, TEXTALIGN_ML);
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoMessage, TCLocalize("Enable auto message"), &g_Config.m_TcAutoMessage, &LeftView, LineSize);
+
+	char aSuffix[32];
+	str_format(aSuffix, sizeof(aSuffix), " %s", TCLocalize("sec", "melancholy interval unit"));
+	LeftView.HSplitTop(LineSize, &Button, &LeftView);
+	Ui()->DoScrollbarOption(&g_Config.m_TcAutoMessageInterval, &g_Config.m_TcAutoMessageInterval, &Button, TCLocalize("Interval"), 10, 3600, &CUi::ms_LogarithmicScrollbarScale, 0, aSuffix);
+
+	LeftView.HSplitTop(MarginExtraSmall, nullptr, &LeftView);
+	LeftView.HSplitTop(LineSize + MarginExtraSmall, &Box, &LeftView);
+	Box.VSplitMid(&Label, &Button);
+	Ui()->DoLabel(&Label, TCLocalize("Message"), FontSize, TEXTALIGN_ML);
+	static CLineInput s_AutoMessageInput(g_Config.m_TcAutoMessageText, sizeof(g_Config.m_TcAutoMessageText));
+	Ui()->DoEditBox(&s_AutoMessageInput, &Button, EditBoxFontSize);
+
+	LeftView.HSplitTop(MarginSmall, nullptr, &LeftView);
+	LeftView.HSplitTop(LineSize, &Button, &LeftView);
+	static CButtonContainer s_SendNowButton;
+	if(DoButton_Menu(&s_SendNowButton, TCLocalize("Send now"), 0, &Button))
+		GameClient()->m_TClient.SendAutoMessageNow();
+
+	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Notes"), HeadlineFontSize, TEXTALIGN_ML);
+	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
+	RightView.HSplitTop(LineSize * 6.0f, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("Sends the message to chat every chosen interval while you are connected to a server. Always starts disabled when the client launches. The minimum interval is 10 seconds to avoid chat flooding."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
+}
+
 void CMenus::RenderSettingsTClientTroll(CUIRect MainView)
 {
 	CUIRect LeftView, RightView, Button, Label;
@@ -2005,20 +2051,35 @@ void CMenus::RenderSettingsTClientTroll(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcSpamEmote, TCLocalize("Spam Emote"), &g_Config.m_TcSpamEmote, &LeftView, LineSize);
 
-	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	if(g_Config.m_TcSpamEmoteId == 0)
-		Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, TCLocalize("Emote"), 0, 16, &CUi::ms_LinearScrollbarScale, 0, " (cycle all)");
-	else
-		Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, TCLocalize("Emote"), 0, 16, &CUi::ms_LinearScrollbarScale, 0, "");
+	{
+		static std::vector<const char *> s_vModeNames;
+		s_vModeNames = {TCLocalize("All emotes in order"), TCLocalize("Random emotes"), TCLocalize("Single emote")};
+		static CUi::SDropDownState s_ModeDropDownState;
+		static CScrollRegion s_ModeDropDownScrollRegion;
+		s_ModeDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_ModeDropDownScrollRegion;
+		CUIRect DropDownRect;
+		LeftView.HSplitTop(LineSize, &DropDownRect, &LeftView);
+		DropDownRect.VSplitLeft(120.0f, &Label, &DropDownRect);
+		Ui()->DoLabel(&Label, TCLocalize("Mode"), FontSize, TEXTALIGN_ML);
+		g_Config.m_TcSpamEmoteMode = Ui()->DoDropDown(&DropDownRect, g_Config.m_TcSpamEmoteMode, s_vModeNames.data(), s_vModeNames.size(), s_ModeDropDownState);
+	}
 
+	if(g_Config.m_TcSpamEmoteMode == 2)
+	{
+		LeftView.HSplitTop(LineSize, &Button, &LeftView);
+		Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteId, &g_Config.m_TcSpamEmoteId, &Button, TCLocalize("Emote"), 1, 16, &CUi::ms_LinearScrollbarScale, 0, "");
+	}
+
+	char aSuffix[32];
+	str_format(aSuffix, sizeof(aSuffix), " %s", TCLocalize("ms", "melancholy delay unit"));
 	LeftView.HSplitTop(LineSize, &Button, &LeftView);
-	Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteInterval, &g_Config.m_TcSpamEmoteInterval, &Button, TCLocalize("Delay"), 500, 10000, &CUi::ms_LinearScrollbarScale, 0, "ms");
+	Ui()->DoScrollbarOption(&g_Config.m_TcSpamEmoteInterval, &g_Config.m_TcSpamEmoteInterval, &Button, TCLocalize("Delay"), 50, 5000, &CUi::ms_LogarithmicScrollbarScale, 0, aSuffix);
 
 	RightView.HSplitTop(HeadlineHeight, &Label, &RightView);
 	Ui()->DoLabel(&Label, TCLocalize("Notes"), HeadlineFontSize, TEXTALIGN_ML);
 	RightView.HSplitTop(MarginSmall, nullptr, &RightView);
-	RightView.HSplitTop(LineSize * 4.0f, &Label, &RightView);
-	Ui()->DoLabel(&Label, TCLocalize("The server limits how often emotes are accepted (default 3 seconds). A shorter delay will not make it faster. Starts disabled every time the client launches."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
+	RightView.HSplitTop(LineSize * 6.0f, &Label, &RightView);
+	Ui()->DoLabel(&Label, TCLocalize("The server decides how fast emotes are accepted (sv_emoticon_delay, 3 seconds by default). A shorter delay only helps on servers that allow frequent emotes. Always starts disabled when the client launches."), FontSize, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
 }
 
 void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
@@ -2180,8 +2241,9 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 		TCLocalize("War List"),
 		TCLocalize("Chat Binds"),
 		TCLocalize("Status Bar"),
-		TCLocalize("Troll"),
-		TCLocalize("Info")};
+		TCLocalize("Info"),
+		TCLocalize("Misc"),
+		TCLocalize("Troll")};
 	static int s_aShowTabs[NUMBER_OF_TCLIENT_TABS] = {};
 	static bool s_TabsInitialized = false;
 	if(!s_TabsInitialized)
@@ -2190,8 +2252,10 @@ void CMenus::RenderSettingsTClientInfo(CUIRect MainView)
 			s_aShowTabs[i] = IsFlagSet(g_Config.m_TcTClientSettingsTabs, i) ? 1 : 0;
 		s_TabsInitialized = true;
 	}
-	for(int i = 0; i < NUMBER_OF_TCLIENT_TABS - 1; ++i)
+	for(int i = 0; i < NUMBER_OF_TCLIENT_TABS; ++i)
 	{
+		if(i == TCLIENT_TAB_INFO)
+			continue;
 		DoButton_CheckBoxAutoVMarginAndSet(&s_aShowTabs[i], apTabNames[i], &s_aShowTabs[i], i % 2 == 0 ? &LeftSettings : &RightSettings, LineSize);
 		SetFlag(g_Config.m_TcTClientSettingsTabs, i, s_aShowTabs[i]);
 	}
@@ -2613,7 +2677,7 @@ void CMenus::RenderSettingsTClientConfigs(CUIRect MainView)
 		RightRow.VSplitLeft(RightInset, nullptr, &RightRow);
 		CUIRect TopCol1, TopCol2;
 		RightRow.VSplitMid(&TopCol1, &TopCol2, 0.0f);
-		if(DoButton_CheckBox(&g_Config.m_TcUiShowTClient, Localize("TClient"), g_Config.m_TcUiShowTClient, &TopCol1))
+		if(DoButton_CheckBox(&g_Config.m_TcUiShowTClient, Localize("Melancholy"), g_Config.m_TcUiShowTClient, &TopCol1))
 			g_Config.m_TcUiShowTClient ^= 1;
 		if(DoButton_CheckBox(&g_Config.m_TcUiCompactList, Localize("Compact List"), g_Config.m_TcUiCompactList, &TopCol2))
 			g_Config.m_TcUiCompactList ^= 1;

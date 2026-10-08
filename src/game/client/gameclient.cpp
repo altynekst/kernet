@@ -1483,8 +1483,7 @@ void CGameClient::InitializeLanguage()
 	// set the language
 	g_Localization.LoadIndexfile(Storage(), Console());
 	if(g_Config.m_ClShowWelcome)
-		g_Localization.SelectDefaultLanguage(Console(), g_Config.m_ClLanguagefile,
-			sizeof(g_Config.m_ClLanguagefile));
+		str_copy(g_Config.m_ClLanguagefile, "languages/russian.txt", sizeof(g_Config.m_ClLanguagefile));
 	g_Localization.Load(g_Config.m_ClLanguagefile, Storage(), Console());
 
 	// TClient
