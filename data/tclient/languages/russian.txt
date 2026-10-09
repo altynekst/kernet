@@ -947,3 +947,564 @@ sec
 ms
 == мс
 
+Aimbot
+== Аимбот
+
+Gores
+== Gores
+
+Fly
+== Полёт
+
+FNG
+== FNG
+
+Visuals
+== Визуал
+
+Recording
+== Запись
+
+KernelNet settings
+== Настройки Melancholy
+
+Uses the active KernelNet theme
+== Использует активную тему Melancholy
+
+Aimbot enabled?
+== Аимбот включён?
+
+Aimbot toggle keybind
+== Клавиша переключения аимбота
+
+Aimbot FOV
+== Поле зрения аимбота
+
+Aim FOV
+== Поле зрения прицела
+
+Aim angles
+== Углы прицеливания
+
+Aim on LMB (no automatic fire)
+== Прицел по ЛКМ (без автоогня)
+
+Aim at hookable blocks
+== Целиться в блоки, за которые можно зацепиться
+
+Players have priority; blocks are used only when no tee can be hooked.
+== Игроки в приоритете; блоки используются, только если ни одного ти нельзя зацепить хуком.
+
+Keeps the tee centered while standing on another tee.
+== Удерживает ти по центру, пока он стоит на другом ти.
+
+Hit range x0.1 tiles
+== Дальность удара (×0,1 тайла)
+
+Aggression
+== Агрессия
+
+Style
+== Стиль
+
+Style: 0=aggressive 1=careful 2=balanced
+== Стиль: 0 = агрессивный, 1 = осторожный, 2 = сбалансированный
+
+Reaction ms
+== Реакция, мс
+
+Trigger attack distance (tiles)
+== Дистанция атаки триггера (тайлы)
+
+Trigger ticks
+== Тики триггера
+
+Rays per tick
+== Лучей за тик
+
+Ticks
+== Тики
+
+FOV
+== Поле зрения
+
+Angles
+== Углы
+
+Direction
+== Направление
+
+Balance bot
+== Бот-балансир
+
+Balance on players
+== Баланс на игроках
+
+Auto-hit enabled?
+== Автоудар включён?
+
+Hammer assist
+== Помощь хаммера
+
+Hammer-gun enabled?
+== Хаммер-ган включён?
+
+Hammer gun
+== Хаммер-ган
+
+Laser triggerbot?
+== Лазерный триггербот?
+
+Dummy hit delay ms
+== Задержка удара дамми, мс
+
+Sub-Tick aiming
+== Прицеливание между тиками
+
+Weapon prediction
+== Предсказание оружия
+
+Spectators and observers
+== Зрители и наблюдатели
+
+Auto grenade save
+== Автоспасение гранатой
+
+Hook drive
+== Хук-драйв
+
+Hook tile
+== Хук-тайл
+
+Hook tile keybind
+== Клавиша хук-тайла
+
+Silent hook tile
+== Тихий хук-тайл
+
+Hook fly
+== Хук-полёт
+
+Triple fly
+== Тройной полёт
+
+Fly enabled?
+== Полёт включён?
+
+Avoid
+== Избегать
+
+Avoid freeze
+== Избегать фриза
+
+Avoid freeze enabled?
+== Избегание фриза включено?
+
+Avoid kill
+== Избегать килл-тайлов
+
+Avoid tele
+== Избегать телепортов
+
+Avoid toggle keybind
+== Клавиша переключения избегания
+
+Allow bounce
+== Разрешить рикошет
+
+Max bounces
+== Максимум рикошетов
+
+Simulation ticks
+== Тики симуляции
+
+Horizon ticks
+== Тики горизонта
+
+Waypoint keybind
+== Клавиша путевой точки
+
+FNG laser
+== Лазер FNG
+
+Laser Unfreeze
+== Разморозка лазером
+
+Auto-unfreeze
+== Авторазморозка
+
+Auto laser
+== Автолазер
+
+Auto-laser (360 scan)?
+== Автолазер (скан 360°)?
+
+Auto-shotgun
+== Автодробовик
+
+Auto-unfreeze debug recording
+== Отладочная запись авторазморозки
+
+Full freeze session recording
+== Полная запись сессии фриза
+
+Force zoom
+== Принудительный зум
+
+Laser decision indicator
+== Индикатор решения лазера
+
+Laser decision pulse
+== Пульс решения лазера
+
+Freeze warning pulse
+== Пульсация предупреждения о фризе
+
+Show attempt
+== Показывать попытку
+
+Silent
+== Тихий
+
+Companion
+== Компаньон
+
+Companion enabled
+== Компаньон включён
+
+Follow distance (tiles)
+== Дистанция следования (тайлы)
+
+AI controller
+== ИИ-контроллер
+
+AI quick mode
+== Быстрый режим ИИ
+
+FentBot
+== FentBot
+
+FentBot enabled?
+== FentBot включён?
+
+FentBot model file (relative to save dir)
+== Файл модели FentBot (относительно папки сохранений)
+
+FentBot: load model
+== FentBot: загрузить модель
+
+KoG AI enabled?
+== ИИ KoG включён?
+
+KoG model file (relative to save dir)
+== Файл модели KoG (относительно папки сохранений)
+
+KoG: export dataset
+== KoG: экспорт датасета
+
+KoG: load model
+== KoG: загрузить модель
+
+KoG: save model
+== KoG: сохранить модель
+
+KoG: status
+== KoG: статус
+
+KoG: train offline
+== KoG: обучение офлайн
+
+Online learning
+== Онлайн-обучение
+
+Difficulty
+== Сложность
+
+0=off 1=fentbot 2=python 3=bc 4=companion 5=kog
+== 0 = выкл, 1 = fentbot, 2 = python, 3 = bc, 4 = companion, 5 = kog
+
+Utility
+== Утилиты
+
+Auto aled enabled?
+== Авто-алед включён?
+
+Fake ping (ms, 0=off)
+== Фейковый пинг (мс, 0 = выкл)
+
+Click GUI
+== Click GUI
+
+Show ClickGUI
+== Показывать ClickGUI
+
+Open / close direct key
+== Клавиша прямого открытия / закрытия
+
+Combat and prediction
+== Бой и предсказание
+
+Player tools
+== Инструменты игрока
+
+Steal nearest name and skin.
+== Копировать имя и скин ближайшего игрока.
+
+Emoji button in chat
+== Кнопка эмодзи в чате
+
+Visual effects and animation
+== Визуальные эффекты и анимации
+
+Enable visual effects
+== Включить визуальные эффекты
+
+Visual profile
+== Визуальный профиль
+
+Effects intensity
+== Интенсивность эффектов
+
+Adaptive effects
+== Адаптивные эффекты
+
+Performance
+== Производительность
+
+Frame rate
+== Частота кадров
+
+Resolution
+== Разрешение
+
+Low quality
+== Низкое качество
+
+Medium quality
+== Среднее качество
+
+High quality
+== Высокое качество
+
+Clean
+== Чистый
+
+Classic
+== Классический
+
+Vivid
+== Яркий
+
+Other player trails
+== Следы других игроков
+
+Trail style
+== Стиль следа
+
+Trail color mode
+== Режим цвета следа
+
+Trail sparkle
+== Искры следа
+
+Trail thickness
+== Толщина следа
+
+Cursor trail
+== След курсора
+
+Weapon effects
+== Эффекты оружия
+
+Weapon effect colors
+== Цвета эффектов оружия
+
+Dynamic weapon lights
+== Динамический свет оружия
+
+Models and actions
+== Модели и действия
+
+Tee motion
+== Движение ти
+
+Player transitions
+== Переходы игроков
+
+Player chat bubbles
+== Облачки чата игроков
+
+Chat bubble duration
+== Длительность облачков чата
+
+Menu particles
+== Частицы меню
+
+Particle amount
+== Количество частиц
+
+Animated menu accents
+== Анимированные акценты меню
+
+Animation speed
+== Скорость анимации
+
+Click GUI animations
+== Анимации Click GUI
+
+Click GUI backdrop effects
+== Эффекты подложки Click GUI
+
+Click ripple
+== Волна при клике
+
+Ripple strength
+== Сила волны
+
+Backdrop softness
+== Мягкость подложки
+
+Gameplay screen accents
+== Акценты игрового экрана
+
+Shader bloom
+== Шейдерное свечение (bloom)
+
+Bloom spread
+== Размытие свечения
+
+HDR exposure
+== Экспозиция HDR
+
+Ambient sweep
+== Фоновая волна
+
+Map atmosphere
+== Атмосфера карты
+
+World light depth
+== Глубина мирового света
+
+Liquid Glass
+== Liquid Glass
+
+Glass intensity
+== Интенсивность стекла
+
+Glass refraction
+== Преломление стекла
+
+Fast video rendering
+== Быстрый рендеринг видео
+
+Focus brackets
+== Скобки фокуса
+
+Feature notifications
+== Уведомления о функциях
+
+Use vanilla DDNet visuals
+== Использовать ванильную графику DDNet
+
+Record audio
+== Запись звука
+
+Recording format
+== Формат записи
+
+Video output
+== Вывод видео
+
+Show HUD
+== Показывать HUD
+
+Show chat
+== Показывать чат
+
+Hammer
+== Молот
+
+Gun
+== Пистолет
+
+Grenade
+== Граната
+
+Hook
+== Хук
+
+Laser
+== Лазер
+
+Jump
+== Прыжок
+
+Aim
+== Прицел
+
+disable if extra weapons
+== отключать при доп. оружии
+
+follow aim
+== следовать за прицелом
+
+ignore friends
+== игнорировать друзей
+
+prefer frozen hook
+== предпочитать хук по замороженным
+
+show FOV
+== показывать поле зрения
+
+show path
+== показывать путь
+
+silent
+== тихий
+
+Debug logging
+== Отладочные логи
+
+Verbose logs
+== Подробные логи
+
+Relaxed server mode
+== Расслабленный режим сервера
+
+Freeze & deep
+== Фриз и дип
+
+Unfreeze & undeep
+== Разморозка и выход из дипа
+
+Balanced
+== Сбалансированный
+
+Theme and aspect ratio
+== Тема и соотношение сторон
+
+Пинговый режим
+== Пинговый режим
+
+Фаст режим
+== Фаст режим
+
+Режим аимбота
+== Режим аимбота
+
+Режимы: 0 легкий, 1 средний, 2 сильный.
+== Режимы: 0 лёгкий, 1 средний, 2 сильный.
+
+Бьёт врага, когда вы зажимаете хаммер.
+== Бьёт врага, когда вы зажимаете хаммер.
+
+Держит пистолет, а выстрел заменяет ударом хаммера.
+== Держит пистолет, а выстрел заменяет ударом хаммера.
+
+Обходит фриз.
+== Обходит фриз.
+
+Работает напрямую с подключенным дамми.
+== Работает напрямую с подключённым дамми.
+
