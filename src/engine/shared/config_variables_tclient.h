@@ -299,3 +299,9 @@ MACRO_CONFIG_INT(TcUiCompactList, tc_ui_compact_list, 0, 0, 1, CFGFLAG_CLIENT | 
 MACRO_CONFIG_INT(TcShowhudDummyPosition, tc_showhud_dummy_position, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Position)")
 MACRO_CONFIG_INT(TcShowhudDummySpeed, tc_showhud_dummy_speed, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Speed)")
 MACRO_CONFIG_INT(TcShowhudDummyAngle, tc_showhud_dummy_angle, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show ingame HUD (Dummy Aim Angle)")
+
+// Melancholy: version spoof
+MACRO_CONFIG_INT(TcSpoofVersion, tc_spoof_version, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spoof client version string and DDNet version number to the server")
+MACRO_CONFIG_INT(TcSpoofPreset, tc_spoof_preset, 1, 0, 7, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Version spoof preset (0=custom, 1=DDNet, 2=TClient, 3=Cactus, 4=EClient, 5=RClient, 6=FeX, 7=StA)")
+MACRO_CONFIG_STR(TcSpoofFullStr, tc_spoof_full_str, 64, "DDNet 19.2 (ef67c53f23176082)", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Full spoofed version string sent to the server")
+MACRO_CONFIG_INT(TcSpoofDDNetVersion, tc_spoof_ddnet_version, 19020, 0, 99999, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spoofed DDNet version number sent to the server")

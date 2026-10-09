@@ -1514,3 +1514,39 @@ Smart Double Jump
 Auto-jump near freeze
 == Авто-прыжок рядом с фризом
 
+Version Spoof
+== Спуфер версии
+
+Spoof version to server
+== Подменять версию серверу
+
+Preset
+== Профиль
+
+Custom
+== Свой
+
+DDNet
+== DDNet
+
+Cactus
+== Cactus
+
+EClient
+== EClient
+
+RClient
+== RClient
+
+FeX
+== FeX
+
+StA
+== StA
+
+Full Version String
+== Полная строка версии
+
+DDNet Version
+== Версия DDNet
+

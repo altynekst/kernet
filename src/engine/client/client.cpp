@@ -74,6 +74,7 @@
 
 #if defined(CONF_PLATFORM_ANDROID)
 #include <android/android_main.h>
+#include <game/client/components/tclient/version_spoof.h>
 #endif
 
 #if defined(CONF_FAMILY_WINDOWS)
@@ -449,8 +450,8 @@ void CClient::SendInfo(int Conn) {
 
   CMsgPacker MsgVer(NETMSG_CLIENTVER, true);
   MsgVer.AddRaw(&m_ConnectionId, sizeof(m_ConnectionId));
-  MsgVer.AddInt(GameClient()->DDNetVersion());
-  MsgVer.AddString(GameClient()->DDNetVersionStr());
+  MsgVer.AddInt(CVersionSpoof::GetDDNetVersion());
+  MsgVer.AddString(CVersionSpoof::GetFullVersionStr());
   SendMsg(Conn, &MsgVer, MSGFLAG_VITAL);
 
   if (IsSixup()) {

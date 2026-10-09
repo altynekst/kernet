@@ -20,6 +20,7 @@
 #include <game/client/components/menus.h>
 #include <game/client/components/skins.h>
 #include <game/client/components/sounds.h>
+#include <game/client/components/tclient/version_spoof.h>
 #include <game/client/components/tclient/trails.h>
 #include <game/client/components/tclient/zz_theme.h>
 #include <game/client/gameclient.h>
@@ -601,7 +602,41 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 				&Inner, LineSize);
 		}
 
-		CUIRect ContentEnd = MainView;
+		{
+			CUIRect Inner;
+			DoFeaturePanel(LeftView, 210.0f, Localize("Version Spoof"), Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcSpoofVersion, Localize("Spoof version to server"), &g_Config.m_TcSpoofVersion, &Inner, LineSize);
+			{
+				static std::vector<const char *> s_vPresetNames;
+				if(s_vPresetNames.size() != (size_t)CVersionSpoof::GetPresetCount())
+				{
+					s_vPresetNames.clear();
+					for(int i = 0; i < CVersionSpoof::GetPresetCount(); i++)
+						s_vPresetNames.push_back(CVersionSpoof::GetPresetName(i));
+				}
+				static CUi::SDropDownState s_PresetDDState;
+				static CScrollRegion s_PresetDDScroll;
+				s_PresetDDState.m_SelectionPopupContext.m_pScrollRegion = &s_PresetDDScroll;
+				CUIRect DDRect;
+				Inner.HSplitTop(LineSize, &DDRect, &Inner);
+				DDRect.VSplitLeft(120.0f, &Label, &DDRect);
+				Ui()->DoLabel(&Label, Localize("Preset"), 14.0f, TEXTALIGN_ML);
+				int NewPreset = Ui()->DoDropDown(&DDRect, g_Config.m_TcSpoofPreset, s_vPresetNames.data(), s_vPresetNames.size(), s_PresetDDState);
+				if(NewPreset != g_Config.m_TcSpoofPreset)
+				{
+					g_Config.m_TcSpoofPreset = NewPreset;
+					CVersionSpoof::ApplyPreset(NewPreset);
+				}
+			}
+			Inner.HSplitTop(LineSize, &Label, &Inner);
+			Ui()->DoLabel(&Label, Localize("Full Version String"), 14.0f, TEXTALIGN_ML);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			static CLineInput s_SpoofStrInput(g_Config.m_TcSpoofFullStr, sizeof(g_Config.m_TcSpoofFullStr));
+			Ui()->DoEditBox(&s_SpoofStrInput, &Button, 14.0f);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_TcSpoofDDNetVersion, &g_Config.m_TcSpoofDDNetVersion, &Button, Localize("DDNet Version"), 0, 99999);
+		}
+				CUIRect ContentEnd = MainView;
 		ContentEnd.y = maximum(LeftView.y, RightView.y);
 		ContentEnd.h = 0.0f;
 		s_MiscScrollRegion.AddRect(ContentEnd);
