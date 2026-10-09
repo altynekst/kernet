@@ -662,7 +662,7 @@ void CTClient::DoSmartDoubleJump()
 	if(!pChar)
 		return;
 
-	if(pChar->m_FreezeEnd != 0 && pChar->m_FreezeEnd != -1)
+	if(GameClient()->m_aClients[LocalId].m_FreezeEnd > 0)
 		return;
 
 	if(pChar->m_Jumped & 1)
@@ -687,9 +687,7 @@ void CTClient::DoSmartDoubleJump()
 
 	const bool Danger =
 		TileF == TILE_FREEZE ||
-		TileF == TILE_DEEP_FREEZE ||
-		TileFR == TILE_FREEZE ||
-		TileFR == TILE_DEEP_FREEZE;
+		TileFR == TILE_FREEZE;
 
 	if(Danger && !m_SmartJumpTriggered)
 	{
