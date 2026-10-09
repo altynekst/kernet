@@ -3267,6 +3267,7 @@ if(TOOLS)
       add_executable(${TOOL} ${EXCLUDE_FROM_ALL}
         ${TOOL_DEPS}
         src/tools/${TOOL}.cpp
+        components/tclient/version_spoof.cpp
         ${EXTRA_TOOL_SRC}
         $<TARGET_OBJECTS:engine-shared>
         $<TARGET_OBJECTS:game-shared>
