@@ -39,6 +39,10 @@ class CTClient : public CComponent
 	int64_t m_AutoMessageNextTime = 0;
 	void DoAutoMessage();
 
+	// Melancholy: smart double jump
+	bool m_SmartJumpTriggered = false;
+	void DoSmartDoubleJump();
+
 	static void ConEmoteCycle(IConsole::IResult *pResult, void *pUserData);
 
 	class IEngineGraphics *m_pGraphics = nullptr;

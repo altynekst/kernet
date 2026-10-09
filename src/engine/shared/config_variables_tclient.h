@@ -260,6 +260,9 @@ MACRO_CONFIG_INT(TcAutoMessage, tc_auto_message, 0, 0, 1, CFGFLAG_CLIENT, "Perio
 MACRO_CONFIG_INT(TcAutoMessageInterval, tc_auto_message_interval, 60, 10, 3600, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Seconds between automatic messages")
 MACRO_CONFIG_STR(TcAutoMessageText, tc_auto_message_text, 200, "", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Text of the automatic message")
 
+// Melancholy: smart double jump
+MACRO_CONFIG_INT(TcSmartDoubleJump, tc_smart_double_jump, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto-jump when a freeze tile is right below you")
+
 // Flags
 MACRO_CONFIG_INT(TcTClientSettingsTabs, tc_tclient_settings_tabs, 0, 0, 65536, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Bit flags to disable settings tabs")
 

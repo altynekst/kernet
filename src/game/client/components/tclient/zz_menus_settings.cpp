@@ -500,6 +500,12 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 
 		{
 			CUIRect Inner;
+			DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcSmartDoubleJump, Localize("Auto-jump near freeze"), &g_Config.m_TcSmartDoubleJump, &Inner, LineSize);
+		}
+
+		{
+			CUIRect Inner;
 			DoFeaturePanel(LeftView, 220.0f, Localize("Auto Message"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoMessage, Localize("Enable auto message"), &g_Config.m_TcAutoMessage, &Inner, LineSize);
 			char aMsgSuffix[32];

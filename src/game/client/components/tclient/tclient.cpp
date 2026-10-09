@@ -569,6 +569,7 @@ void CTClient::OnRender()
 	DoFinishCheck();
 	DoSpamEmote();
 	DoAutoMessage();
+	DoSmartDoubleJump();
 }
 
 void CTClient::DoSpamEmote()
@@ -641,6 +642,64 @@ void CTClient::SendAutoMessageNow()
 		return;
 	GameClient()->m_Chat.SendChat(0, g_Config.m_TcAutoMessageText);
 	m_AutoMessageNextTime = 0;
+}
+
+void CTClient::DoSmartDoubleJump()
+{
+	if(!g_Config.m_TcSmartDoubleJump)
+	{
+		m_SmartJumpTriggered = false;
+		return;
+	}
+	if(Client()->State() != IClient::STATE_ONLINE)
+		return;
+
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	if(LocalId < 0)
+		return;
+
+	const CNetObj_Character *pChar = GameClient()->m_Snap.m_pLocalCharacter;
+	if(!pChar)
+		return;
+
+	if(pChar->m_FreezeEnd != 0 && pChar->m_FreezeEnd != -1)
+		return;
+
+	if(pChar->m_Jumped & 1)
+	{
+		m_SmartJumpTriggered = false;
+		return;
+	}
+
+	const int Dummy = g_Config.m_ClDummy;
+	CNetObj_PlayerInput *pInput = &GameClient()->m_Controls.m_aInputData[Dummy];
+
+	const int TileSize = 32;
+	const int CheckX = (int)pChar->m_X;
+	const int CheckY = (int)(pChar->m_Y + TileSize);
+
+	int TileF = 0, TileFR = 0;
+	if(GameClient()->Collision())
+	{
+		TileF = GameClient()->Collision()->GetTile(CheckX, CheckY);
+		TileFR = GameClient()->Collision()->GetFrontTile(CheckX, CheckY);
+	}
+
+	const bool Danger =
+		TileF == TILE_FREEZE ||
+		TileF == TILE_DEEP_FREEZE ||
+		TileFR == TILE_FREEZE ||
+		TileFR == TILE_DEEP_FREEZE;
+
+	if(Danger && !m_SmartJumpTriggered)
+	{
+		pInput->m_Jump = 1;
+		m_SmartJumpTriggered = true;
+	}
+	else if(!Danger)
+	{
+		m_SmartJumpTriggered = false;
+	}
 }
 
 
