@@ -938,6 +938,9 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			&g_Config.m_ClZzFngFastMode, Localize("Фаст режим"),
 			&g_Config.m_ClZzFngFastMode, &Inner, LineSize);
 		DoButton_CheckBoxAutoVMarginAndSet(
+			&g_Config.m_ClZzFngFastFire, Localize("Fast fire (hammer + laser)"),
+			&g_Config.m_ClZzFngFastFire, &Inner, LineSize);
+		DoButton_CheckBoxAutoVMarginAndSet(
 			&g_Config.m_ClZzFngDebug, Localize("Debug logging"),
 			&g_Config.m_ClZzFngDebug, &Inner, LineSize);
 		Inner.HSplitTop(LineSize, &Button, &Inner);

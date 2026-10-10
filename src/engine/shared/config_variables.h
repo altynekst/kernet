@@ -1007,6 +1007,10 @@ MACRO_CONFIG_INT(ClZzFngPingMode, cl_zz_fng_ping_mode, 0, 0, 1,
 MACRO_CONFIG_INT(ClZzFngFastMode, cl_zz_fng_fast_mode, 0, 0, 1,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"KernelNet FNG auto-laser: fast scan mode")
+
+MACRO_CONFIG_INT(ClZzFngFastFire, cl_zz_fng_fast_fire, 0, 0, 1,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Fast fire: auto hammer then laser in FNG")
 MACRO_CONFIG_INT(
 	ClZzFngAimMode, cl_zz_fng_aim_mode, 2, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"KernelNet FNG auto-laser: aim mode 0 light, 1 medium, 2 strong")

@@ -981,6 +981,53 @@ int CControls::SnapInput(int *pData)
 						InjectedAutoShot = true;
 					}
 				}
+				// ===== Fast Fire (trigger): хаммер -> лазер =====
+				static int s_aFastFireStage[NUM_DUMMIES] = {0, 0, 0};
+				else if(g_Config.m_ClZzFngFastFire && TriggerFound)
+				{
+					const CNetObj_Character *pFfChar = GameClient()->m_Snap.m_pLocalCharacter;
+					if(pFfChar)
+					{
+						const bool CurrentIsHammer = pFfChar->m_Weapon == WEAPON_HAMMER;
+						const bool CurrentIsLaser = pFfChar->m_Weapon == WEAPON_LASER;
+						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
+						switch(s_aFastFireStage[FngDummyIndex])
+						{
+						case 0:
+							if(!CurrentIsHammer)
+								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
+							else
+							{
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireStage[FngDummyIndex] = 1;
+							}
+							break;
+						case 1:
+							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
+							s_aFastFireStage[FngDummyIndex] = 2;
+							break;
+						case 2:
+							if(CurrentIsLaser && LaserReadyNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
+							{
+								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
+								m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
+								if(!m_aInputData[FngDummyIndex].m_TargetX && !m_aInputData[FngDummyIndex].m_TargetY)
+									m_aInputData[FngDummyIndex].m_TargetX = 1;
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFngLaserReleasePending[FngDummyIndex] = true;
+								s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
+								s_aFastFireStage[FngDummyIndex] = 3;
+							}
+							break;
+						case 3:
+							s_aFastFireStage[FngDummyIndex] = 0;
+							break;
+						default:
+							s_aFastFireStage[FngDummyIndex] = 0;
+							break;
+						}
+					}
+				}
 				else if(g_Config.m_ClZzFngTriggerLaser && !AimOnFire && TriggerFound && CanShootNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
 				{
 					m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
