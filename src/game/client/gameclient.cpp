@@ -5074,7 +5074,7 @@ void CGameClient::DoCloseAvoidInput(CNetObj_PlayerInput &In, int Conn)
 	if(!g_Config.m_ClZzAvoidClose)
 		return;
 
-	const int LocalId = (Conn >= 0 && Conn < NUM_DUMMIES) ? m_aLocalIds[Conn] : m_Snap.m_LocalClientIdm_Snap.m_LocalClientId;
+	const int LocalId = (Conn >= 0 && Conn < NUM_DUMMIES) ? m_aLocalIds[Conn] : m_Snap.m_LocalClientId;
 	if(LocalId < 0 || LocalId >= MAX_CLIENTS)
 		return;
 
