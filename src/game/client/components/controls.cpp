@@ -992,20 +992,38 @@ int CControls::SnapInput(int *pData)
 						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
 						switch(s_aFastFireStage[FngDummyIndex])
 						{
-						case 0:
-							if(!CurrentIsHammer)
+						case 0: // стартовая стадия — решаем с чего начать
+							if(CurrentIsHammer)
+							{
+								// Хаммер в руках -> сразу удар
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireStage[FngDummyIndex] = 2;
+							}
+							else if(CurrentIsLaser)
+							{
+								// Лазер в руках -> переключаемся на хаммер
 								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
+								s_aFastFireStage[FngDummyIndex] = 1;
+							}
 							else
 							{
-								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								// Другое оружие -> сначала на хаммер
+								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
 								s_aFastFireStage[FngDummyIndex] = 1;
 							}
 							break;
-						case 1:
-							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
-							s_aFastFireStage[FngDummyIndex] = 2;
+						case 1: // хаммер в руках? -> удар
+							if(CurrentIsHammer)
+							{
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireStage[FngDummyIndex] = 2;
+							}
 							break;
-						case 2:
+						case 2: // переключаемся на лазер
+							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
+							s_aFastFireStage[FngDummyIndex] = 3;
+							break;
+						case 3: // лазер в руках -> выстрел
 							if(CurrentIsLaser && LaserReadyNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
 							{
 								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
@@ -1015,10 +1033,10 @@ int CControls::SnapInput(int *pData)
 								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
 								s_aFngLaserReleasePending[FngDummyIndex] = true;
 								s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
-								s_aFastFireStage[FngDummyIndex] = 3;
+								s_aFastFireStage[FngDummyIndex] = 4;
 							}
 							break;
-						case 3:
+						case 4: // сброс
 							s_aFastFireStage[FngDummyIndex] = 0;
 							break;
 						default:
