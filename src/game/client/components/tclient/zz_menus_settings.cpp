@@ -480,6 +480,9 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			Ui()->DoScrollbarOption(&g_Config.m_ClZzFakePing,
 				&g_Config.m_ClZzFakePing, &Button,
 				Localize("Fake ping (ms, 0=off)"), 0, 999);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSensBoost,
+				Localize("Sensitivity x5 boost"), &g_Config.m_ClZzSensBoost,
+				&Inner, LineSize);
 			Inner.HSplitTop(8.0f, nullptr, &Inner);
 			Inner.HSplitTop(LineSize, &Label, &Inner);
 			Ui()->DoLabel(&Label, Localize("Companion"), 15.0f, TEXTALIGN_ML);

@@ -1758,6 +1758,10 @@ MACRO_CONFIG_INT(InpControllerAbsolute, inp_controller_absolute, 0, 0, 1,
 	"Enable absolute controller aiming ingame")
 MACRO_CONFIG_INT(InpControllerSens, inp_controller_sens, 100, 1, 100000,
 	CFGFLAG_SAVE | CFGFLAG_CLIENT, "Ingame controller sensitivity")
+
+MACRO_CONFIG_INT(ClZzSensBoost, cl_zz_sens_boost, 0, 0, 1,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"Multiply mouse/controller sensitivity by 5x")
 MACRO_CONFIG_INT(InpControllerX, inp_controller_x, 0, 0, 12,
 	CFGFLAG_SAVE | CFGFLAG_CLIENT,
 	"Controller axis that controls X axis of cursor")

@@ -1601,3 +1601,6 @@ Speed threshold
 Avoid tuning
 == Настройки Avoid
 
+Sensitivity x5 boost
+== Чувствительность ×5
+
