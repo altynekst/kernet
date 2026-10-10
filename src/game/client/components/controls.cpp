@@ -990,41 +990,48 @@ int CControls::SnapInput(int *pData)
 						const bool CurrentIsHammer = pFfChar->m_Weapon == WEAPON_HAMMER;
 						const bool CurrentIsLaser = pFfChar->m_Weapon == WEAPON_LASER;
 						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
+						const int DelayTicks = std::clamp(g_Config.m_ClZzFngFastFireDelay, 1, 30);
 						switch(s_aFastFireStage[FngDummyIndex])
 						{
-						case 0: // стартовая стадия — решаем с чего начать
+						case 0: // старт
 							if(CurrentIsHammer)
 							{
-								// Хаммер в руках -> сразу удар
+								// хаммер в руках -> удар
 								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireWait[FngDummyIndex] = DelayTicks;
 								s_aFastFireStage[FngDummyIndex] = 2;
-							}
-							else if(CurrentIsLaser)
-							{
-								// Лазер в руках -> переключаемся на хаммер
-								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
-								s_aFastFireStage[FngDummyIndex] = 1;
 							}
 							else
 							{
-								// Другое оружие -> сначала на хаммер
+								// лазер или другое -> сначала хаммер
 								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
 								s_aFastFireStage[FngDummyIndex] = 1;
 							}
 							break;
-						case 1: // хаммер в руках? -> удар
+						case 1: // ждём хаммер в руках
 							if(CurrentIsHammer)
 							{
 								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireWait[FngDummyIndex] = DelayTicks;
 								s_aFastFireStage[FngDummyIndex] = 2;
 							}
 							break;
-						case 2: // переключаемся на лазер
-							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
-							s_aFastFireStage[FngDummyIndex] = 3;
+						case 2: // ждём анимацию удара
+							if(s_aFastFireWait[FngDummyIndex] > 0)
+								s_aFastFireWait[FngDummyIndex]--;
+							else
+								s_aFastFireStage[FngDummyIndex] = 3;
 							break;
-						case 3: // лазер в руках -> выстрел
-							if(CurrentIsLaser && LaserReadyNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
+						case 3: // переключаемся на лазер
+							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
+							s_aFastFireStage[FngDummyIndex] = 4;
+							break;
+						case 4: // ждём лазер в руках
+							if(CurrentIsLaser)
+								s_aFastFireStage[FngDummyIndex] = 5;
+							break;
+						case 5: // выстрел
+							if(LaserReadyNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
 							{
 								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
 								m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
@@ -1033,14 +1040,16 @@ int CControls::SnapInput(int *pData)
 								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
 								s_aFngLaserReleasePending[FngDummyIndex] = true;
 								s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
-								s_aFastFireStage[FngDummyIndex] = 4;
+								s_aFastFireStage[FngDummyIndex] = 6;
 							}
 							break;
-						case 4: // сброс
+						case 6: // сброс
 							s_aFastFireStage[FngDummyIndex] = 0;
+							s_aFastFireWait[FngDummyIndex] = 0;
 							break;
 						default:
 							s_aFastFireStage[FngDummyIndex] = 0;
+							s_aFastFireWait[FngDummyIndex] = 0;
 							break;
 						}
 					}
