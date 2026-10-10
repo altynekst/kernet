@@ -5420,8 +5420,9 @@ void CClient::RegisterCommands() {
   m_pConsole->Register("dummy_reset", "?i['1'|'2']", CFGFLAG_CLIENT,
                        Con_DummyResetInput, this, "Reset dummy input");
   m_pConsole->Register("dummy_cycle", "", CFGFLAG_CLIENT, Con_DummyCycle, this,
-  m_pConsole->Register("dummy_switch", "", CFGFLAG_CLIENT, Con_DummySwitch, this,
                        "Cycle control between connected local players");
+  m_pConsole->Register("dummy_switch", "", CFGFLAG_CLIENT, Con_DummySwitch, this,
+                       "Switch between connected local players (main -> dummy1 -> dummy2)");
 
   m_pConsole->Register("quit", "", CFGFLAG_CLIENT | CFGFLAG_STORE, Con_Quit,
                        this, "Quit the client");
