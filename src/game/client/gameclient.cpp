@@ -5066,60 +5066,6 @@ void CGameClient::RenderKinetixLaserUnfreezeAttempt()
 }
 
 
-// ============================================================
-// Melancholy: Close-range avoid
-// ============================================================
-void CGameClient::DoCloseAvoidInput(CNetObj_PlayerInput &In, int Conn)
-{
-	if(!g_Config.m_ClZzAvoidClose)
-		return;
-
-	const int LocalId = (Conn >= 0 && Conn < NUM_DUMMIES) ? m_aLocalIds[Conn] : m_Snap.m_LocalClientId;
-	if(LocalId < 0 || LocalId >= MAX_CLIENTS)
-		return;
-
-	// Получаем позицию, скорость и контекст
-	const vec2 Pos = m_aClients[LocalId].m_RegularPredicted.m_Pos;
-	const vec2 Vel = m_aClients[LocalId].m_RegularPredicted.m_Vel;
-
-	// Team через m_Teams, Switchers через m_PredictedWorld
-	const int Team = m_Teams.Team(LocalId);
-	const std::vector<SSwitchers> *pSwitchers = &m_PredictedWorld.Switchers();
-
-	// Лямбда проверки фриза в точке
-	auto IsFreezeAt = [&](const vec2 &P) -> bool {
-		return DmdIsFreezeAtPoint(Collision(), P, pSwitchers, Team);
-	};
-
-	// 1. Предсказание позиции через N тиков
-	const int PredictTicks = std::clamp(g_Config.m_ClZzAvoidClosePredict, 1, 30);
-	const vec2 PredictedPos = Pos + Vel * ((float)PredictTicks / 50.0f);
-
-	// 2. Проверка фриза в направлении движения (1 тайл вперёд) + предсказанная позиция
-	const int Dir = In.m_Direction;
-	const bool FreezeInDir =
-		(Dir > 0 && (IsFreezeAt(Pos + vec2(32.0f, 0.0f)) || IsFreezeAt(PredictedPos))) ||
-		(Dir < 0 && (IsFreezeAt(Pos + vec2(-32.0f, 0.0f)) || IsFreezeAt(PredictedPos)));
-
-	// 3. Торможение или стоп
-	if(FreezeInDir)
-	{
-		const float SpeedX = fabsf(Vel.x);
-		const float SpeedLimit = (float)std::clamp(g_Config.m_ClZzAvoidCloseSpeed, 0, 20);
-		if(SpeedX > SpeedLimit)
-			In.m_Direction = (Dir > 0) ? -1 : 1;  // противоположное — тормозим
-		else
-			In.m_Direction = 0;                    // стоп
-	}
-
-	// 4. Фриз под ногами — прыжок
-	if(g_Config.m_ClZzAvoidCloseJump && IsFreezeAt(Pos + vec2(0.0f, 32.0f)))
-		In.m_Jump = ((In.m_Jump + 2) | 1) & INPUT_STATE_MASK;
-
-	// 5. Фриз сверху — не прыгаем
-	if(IsFreezeAt(Pos + vec2(0.0f, -32.0f)) && (In.m_Jump & 1))
-		In.m_Jump = 0;
-}
 
 int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 {
@@ -9845,7 +9791,6 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 		Out.m_TargetY = (int)Aim.y;
 		m_DummyInput = Out;
 		m_Controls.m_aInputData[Conn] = Out;
-		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 		mem_copy(pData, &Out, sizeof(Out));
 		return sizeof(Out);
 	}
@@ -9920,7 +9865,6 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				Out.m_Hook = HookBit ? 1 : 0;
 				if(JumpBit)
 					Out.m_Jump = (Out.m_Jump + 2) | 1;
-				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 				mem_copy(pData, &Out, sizeof(Out));
 				return sizeof(Out);
 			}
@@ -9990,7 +9934,6 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 			if(!Force && !Out.m_Direction && !Out.m_Jump && !Out.m_Hook &&
 				!Out.m_Fire)
 				return 0;
-			if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 			mem_copy(pData, &Out, sizeof(Out));
 			return sizeof(Out);
 		}
@@ -10254,7 +10197,6 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				if(JumpBit)
 					Out.m_Jump = (Out.m_Jump + 2) | 1;
 
-				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 				mem_copy(pData, &Out, sizeof(Out));
 				return sizeof(Out);
 			}
@@ -10358,7 +10300,6 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				}
 			}
 		}
-		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 		mem_copy(pData, &Out, sizeof(Out));
 		return sizeof(Out);
 	}

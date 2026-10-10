@@ -373,7 +373,6 @@ private:
 	std::vector<vec2> m_vKinetixLaserUnfreezePath;
 	int64_t m_KinetixLaserUnfreezePathTime = 0;
 	void AutoUnfreezeDebugUpdateRecording();
-	void DoCloseAvoidInput(CNetObj_PlayerInput &In, int Conn);
 	void AutoUnfreezeDebugStop();
 	void AutoUnfreezeObserveRawLasers();
 	void AutoUnfreezeStartShotObservation(

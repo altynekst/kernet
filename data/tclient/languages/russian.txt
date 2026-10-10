@@ -1598,3 +1598,6 @@ Predict ticks
 Speed threshold
 == Порог скорости
 
+Avoid tuning
+== Настройки Avoid
+

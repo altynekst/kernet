@@ -1435,30 +1435,55 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		MainView.VSplitMid(&Left, &Right, 20.0f);
 
 		{
-			CUIRect Inner;
-			DoFeaturePanel(Left, 210.0f, Localize("Avoid New"), Inner);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidClose,
-				Localize("Close-range avoid"), &g_Config.m_ClZzAvoidClose, &Inner, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidCloseJump,
-				Localize("Auto-jump under feet"), &g_Config.m_ClZzAvoidCloseJump, &Inner, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidCloseSides,
-				Localize("Stop on sides"), &g_Config.m_ClZzAvoidCloseSides, &Inner, LineSize);
-			CUIRect Button;
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidClosePredict,
-				&g_Config.m_ClZzAvoidClosePredict, &Button,
-				Localize("Predict ticks"), 1, 30);
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidCloseSpeed,
-				&g_Config.m_ClZzAvoidCloseSpeed, &Button,
-				Localize("Speed threshold"), 0, 20);
+			CUIRect Inner, Button;
+			DoFeaturePanel(Left, 340.0f, Localize("Avoid"), Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidEnabled,
+				Localize("Avoid freeze enabled?"), &g_Config.m_ClZzAvoidEnabled, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidFreeze,
+				Localize("Avoid freeze"), &g_Config.m_ClZzAvoidFreeze, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidTele,
+				Localize("Avoid tele"), &g_Config.m_ClZzAvoidTele, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidKill,
+				Localize("Avoid kill"), &g_Config.m_ClZzAvoidKill, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidDirection,
+				Localize("Allow direction"), &g_Config.m_ClZzAvoidDirection, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidJump,
+				Localize("Allow jump"), &g_Config.m_ClZzAvoidJump, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidHookAssist,
+				Localize("Hook assist"), &g_Config.m_ClZzAvoidHookAssist, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidAim,
+				Localize("Allow aim"), &g_Config.m_ClZzAvoidAim, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidSilent,
+				Localize("Silent"), &g_Config.m_ClZzAvoidSilent, &Inner, LineSize);
 		}
 
 		{
-			CUIRect Inner, Label;
-			DoFeaturePanel(Right, 110.0f, Localize("Notes"), Inner);
-			Inner.HSplitTop(LineSize * 5.0f, &Label, &Inner);
-			Ui()->DoLabel(&Label, Localize("Keeps you right next to freeze tiles without entering them. Jumps if freeze is under your feet, stops if freeze is in movement direction, doesn't jump if freeze is above."), 12.0f, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
+			CUIRect Inner, Button;
+			DoFeaturePanel(Right, 340.0f, Localize("Avoid tuning"), Inner);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidLookahead,
+				&g_Config.m_ClZzAvoidLookahead, &Button,
+				Localize("Lookahead"), 4, 128);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidHookAssistRange,
+				&g_Config.m_ClZzAvoidHookAssistRange, &Button,
+				Localize("Hook range"), 16, 512);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidTicks,
+				&g_Config.m_ClZzAvoidTicks, &Button,
+				Localize("Simulation ticks"), 1, 20);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidTriggerTicks,
+				&g_Config.m_ClZzAvoidTriggerTicks, &Button,
+				Localize("Trigger ticks"), 1, 20);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidFov,
+				&g_Config.m_ClZzAvoidFov, &Button,
+				Localize("FOV"), 5, 360);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidAngles,
+				&g_Config.m_ClZzAvoidAngles, &Button,
+				Localize("Angles"), 1, 144);
 		}
 	}
 	TextRender()->TextColor(OldTextColor);
