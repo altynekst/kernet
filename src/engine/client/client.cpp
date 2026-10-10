@@ -425,12 +425,12 @@ void CClient::SendBClientInfo(int Conn) {
 
   {
     CMsgPacker Msg(NETMSG_IAMBESTCLIENT, true);
-    Msg.AddString(BESTCLIENT_VERSION " built on " __DATE__ ", " __TIME__);
+    Msg.AddString(CVersionSpoof::GetFullVersionStr());
     SendMsg(Conn, &Msg, MSGFLAG_VITAL);
   }
   {
     CMsgPacker Msg(NETMSG_IAMTATER, true);
-    Msg.AddString(BESTCLIENT_VERSION " built on " __DATE__ ", " __TIME__);
+    Msg.AddString(CVersionSpoof::GetFullVersionStr());
     SendMsg(Conn, &Msg, MSGFLAG_VITAL);
   }
   {
