@@ -44,7 +44,7 @@ using namespace std::chrono_literals;
 void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 {
 	static int s_SubTab = 0;
-	static CButtonContainer s_aSubTabs[7] = {};
+	static CButtonContainer s_aSubTabs[8] = {};
 	static int64_t s_SubTabAnimStart = 0;
 	static int s_SubTabAnimFrom = 0;
 	static int s_SubTabAnimTo = 0;
@@ -54,14 +54,14 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(26.0f, &TabBar, &MainView);
-	const float TabWidth = TabBar.w / 7.0f;
+	const float TabWidth = TabBar.w / 8.0f;
 	const char *apTabNames[] = {Localize("Aimbot"), Localize("Gores"),
 		Localize("Misc"), Localize("Fly"),
 		Localize("FNG"), Localize("Visuals"),
-		"Recording"};
-	if(s_SubTab >= 7)
+		"Recording", Localize("Avoid New")};
+	if(s_SubTab >= 8)
 		s_SubTab = 0;
-	for(int i = 0; i < 7; i++)
+	for(int i = 0; i < 8; i++)
 	{
 		TabBar.VSplitLeft(TabWidth, &Button, &TabBar);
 		Button.VMargin(1.5f, &Button);
@@ -1426,6 +1426,30 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 				Storage()->GetCompletePath(IStorage::TYPE_SAVE, "videos", aVideosFolder, sizeof(aVideosFolder));
 				Client()->ViewFile(aVideosFolder);
 			}
+		}
+	}
+	else if(s_SubTab == 7)
+	{
+		const float LineSize = 20.0f;
+		CUIRect Left, Right;
+		MainView.VSplitMid(&Left, &Right, 20.0f);
+
+		{
+			CUIRect Inner;
+			DoFeaturePanel(Left, 110.0f, Localize("Avoid New"), Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidClose,
+				Localize("Close-range avoid"), &g_Config.m_ClZzAvoidClose, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidCloseJump,
+				Localize("Auto-jump under feet"), &g_Config.m_ClZzAvoidCloseJump, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidCloseSides,
+				Localize("Stop on sides"), &g_Config.m_ClZzAvoidCloseSides, &Inner, LineSize);
+		}
+
+		{
+			CUIRect Inner, Label;
+			DoFeaturePanel(Right, 110.0f, Localize("Notes"), Inner);
+			Inner.HSplitTop(LineSize * 5.0f, &Label, &Inner);
+			Ui()->DoLabel(&Label, Localize("Keeps you right next to freeze tiles without entering them. Jumps if freeze is under your feet, stops if freeze is in movement direction, doesn't jump if freeze is above."), 12.0f, TEXTALIGN_TL, {.m_MaxWidth = Label.w});
 		}
 	}
 	TextRender()->TextColor(OldTextColor);

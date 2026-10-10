@@ -5065,6 +5065,54 @@ void CGameClient::RenderKinetixLaserUnfreezeAttempt()
 	Graphics()->LinesEnd();
 }
 
+
+// ============================================================
+// Melancholy: Close-range avoid
+// ============================================================
+void CGameClient::DoCloseAvoidInput(CNetObj_PlayerInput &In)
+{
+	if(!g_Config.m_ClZzAvoidClose)
+		return;
+
+	const int LocalId = m_Snap.m_LocalClientId;
+	if(LocalId < 0 || LocalId >= MAX_CLIENTS)
+		return;
+
+	const vec2 Pos = m_aClients[LocalId].m_RegularPredicted.m_Pos;
+
+	auto IsFreeze = [&](float dx, float dy) -> bool {
+		const int x = (int)(Pos.x + dx);
+		const int y = (int)(Pos.y + dy);
+		const int T = Collision()->GetTile(x, y);
+		const int FT = Collision()->GetFrontTile(x, y);
+		return T == TILE_FREEZE || T == TILE_DFREEZE || T == TILE_LFREEZE ||
+		       FT == TILE_FREEZE || FT == TILE_DFREEZE || FT == TILE_LFREEZE;
+	};
+
+	const float R = 32.0f;
+	const bool L = IsFreeze(-R, 0.0f);
+	const bool Rr = IsFreeze(R, 0.0f);
+	const bool U = IsFreeze(0.0f, -R);
+	const bool D = IsFreeze(0.0f, R);
+
+	// Ð¤ÑÐ¸Ð· Ð¿Ð¾Ð´ Ð½Ð¾Ð³Ð°Ð¼Ð¸ -> Ð¿ÑÑÐ¶Ð¾Ðº
+	if(D && g_Config.m_ClZzAvoidCloseJump && (In.m_Jump & 1) == 0)
+		In.m_Jump = ((In.m_Jump + 2) | 1) & INPUT_STATE_MASK;
+
+	// Ð¤ÑÐ¸Ð· Ð² Ð½Ð°Ð¿ÑÐ°Ð²Ð»ÐµÐ½Ð¸Ð¸ -> ÑÑÐ¾Ð¿
+	if(g_Config.m_ClZzAvoidCloseSides &&
+	   ((In.m_Direction == -1 && L) || (In.m_Direction == 1 && Rr)))
+		In.m_Direction = 0;
+
+	// Ð¤ÑÐ¸Ð· ÑÐ²ÐµÑÑÑ -> Ð½Ðµ Ð¿ÑÑÐ³Ð°ÐµÐ¼
+	if(U && (In.m_Jump & 1))
+		In.m_Jump = 0;
+
+	// Ð¤ÑÐ¸Ð· Ñ Ð´Ð²ÑÑ ÑÑÐ¾ÑÐ¾Ð½ -> ÑÑÐ¾Ð¸Ð¼
+	if(g_Config.m_ClZzAvoidCloseSides && L && Rr)
+		In.m_Direction = 0;
+}
+
 int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 {
 	if(Conn == g_Config.m_ClDummy)
@@ -9789,6 +9837,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 		Out.m_TargetY = (int)Aim.y;
 		m_DummyInput = Out;
 		m_Controls.m_aInputData[Conn] = Out;
+		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
 		mem_copy(pData, &Out, sizeof(Out));
 		return sizeof(Out);
 	}
@@ -9863,6 +9912,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				Out.m_Hook = HookBit ? 1 : 0;
 				if(JumpBit)
 					Out.m_Jump = (Out.m_Jump + 2) | 1;
+				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
 				mem_copy(pData, &Out, sizeof(Out));
 				return sizeof(Out);
 			}
@@ -9932,6 +9982,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 			if(!Force && !Out.m_Direction && !Out.m_Jump && !Out.m_Hook &&
 				!Out.m_Fire)
 				return 0;
+			if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
 			mem_copy(pData, &Out, sizeof(Out));
 			return sizeof(Out);
 		}
@@ -10195,6 +10246,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				if(JumpBit)
 					Out.m_Jump = (Out.m_Jump + 2) | 1;
 
+				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
 				mem_copy(pData, &Out, sizeof(Out));
 				return sizeof(Out);
 			}
@@ -10298,6 +10350,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				}
 			}
 		}
+		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
 		mem_copy(pData, &Out, sizeof(Out));
 		return sizeof(Out);
 	}

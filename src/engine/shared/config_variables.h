@@ -888,6 +888,16 @@ MACRO_CONFIG_INT(ClZzAvoidTicks, cl_zz_avoid_ticks, 10, 1, 20,
 MACRO_CONFIG_INT(ClZzAvoidTriggerTicks, cl_zz_avoid_trigger_ticks, 3, 1, 20,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"Avoid: danger trigger prediction ticks")
+
+MACRO_CONFIG_INT(ClZzAvoidClose, cl_zz_avoid_close, 0, 0, 1,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid New: keep tee near freeze tiles without entering them")
+MACRO_CONFIG_INT(ClZzAvoidCloseJump, cl_zz_avoid_close_jump, 1, 0, 1,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid New: auto-jump when freeze is under feet")
+MACRO_CONFIG_INT(ClZzAvoidCloseSides, cl_zz_avoid_close_sides, 1, 0, 1,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid New: stop movement if freeze is on the side")
 MACRO_CONFIG_INT(ClKnTileAlign, cl_kn_05, 0, 0, 1,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_HIDDEN,
 	"Align tee to the configured sub-tile X coordinate while held")

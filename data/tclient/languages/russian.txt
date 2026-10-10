@@ -1577,3 +1577,18 @@ Disconnect Dummy 2
 Connecting Dummy 2...
 == Подключение дамми 2...
 
+Avoid New
+== Avoid New
+
+Close-range avoid
+== Ближний avoid
+
+Auto-jump under feet
+== Авто-прыжок под ногами
+
+Stop on sides
+== Стоп по бокам
+
+Keeps you right next to freeze tiles without entering them. Jumps if freeze is under your feet, stops if freeze is in movement direction, doesn't jump if freeze is above.
+== Держит тебя впритык к фризу, но не даёт зайти в него. Прыгает, если фриз под ногами. Останавливает, если фриз в направлении движения. Не даёт прыгать, если фриз сверху.
+
