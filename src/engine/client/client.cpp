@@ -4053,6 +4053,39 @@ void CClient::Con_DummyCycle(IConsole::IResult *pResult, void *pUserData) {
           : "This server does not allow dummy connections.");
 }
 
+
+void CClient::Con_DummySwitch(IConsole::IResult *pResult, void *pUserData) {
+  CClient *pSelf = (CClient *)pUserData;
+
+  // Проверяем что хоть один дамми подключён или подключается
+  bool AnyDummyAvail = false;
+  for (int i = CONN_DUMMY; i < NUM_DUMMIES; i++) {
+    if (pSelf->DummyConnected(i) || pSelf->DummyConnecting(i) ||
+        pSelf->DummyConnectingDelayed(i)) {
+      AnyDummyAvail = true;
+      break;
+    }
+  }
+  if (!AnyDummyAvail) {
+    pSelf->m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "dummy",
+                             "No dummy connected. Connect a dummy first.");
+    return;
+  }
+
+  // Простой цикл: main -> dummy1 -> dummy2 -> main -> ...
+  for (int Offset = 1; Offset <= NUM_DUMMIES; Offset++) {
+    int Conn = (g_Config.m_ClDummy + Offset) % NUM_DUMMIES;
+    if (Conn == CONN_MAIN) {
+      g_Config.m_ClDummy = CONN_MAIN;
+      return;
+    }
+    if (pSelf->DummyConnected(Conn) || pSelf->DummyConnecting(Conn)) {
+      g_Config.m_ClDummy = Conn;
+      return;
+    }
+  }
+}
+
 void CClient::Con_Quit(IConsole::IResult *pResult, void *pUserData) {
   CClient *pSelf = (CClient *)pUserData;
   pSelf->Quit();
@@ -5387,6 +5420,7 @@ void CClient::RegisterCommands() {
   m_pConsole->Register("dummy_reset", "?i['1'|'2']", CFGFLAG_CLIENT,
                        Con_DummyResetInput, this, "Reset dummy input");
   m_pConsole->Register("dummy_cycle", "", CFGFLAG_CLIENT, Con_DummyCycle, this,
+  m_pConsole->Register("dummy_switch", "", CFGFLAG_CLIENT, Con_DummySwitch, this,
                        "Cycle control between connected local players");
 
   m_pConsole->Register("quit", "", CFGFLAG_CLIENT | CFGFLAG_STORE, Con_Quit,

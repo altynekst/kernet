@@ -491,6 +491,7 @@ public:
   static void Con_DummyDisconnect(IConsole::IResult *pResult, void *pUserData);
   static void Con_DummyResetInput(IConsole::IResult *pResult, void *pUserData);
   static void Con_DummyCycle(IConsole::IResult *pResult, void *pUserData);
+  static void Con_DummySwitch(IConsole::IResult *pResult, void *pUserData);
 
   static void Con_Quit(IConsole::IResult *pResult, void *pUserData);
   static void Con_Restart(IConsole::IResult *pResult, void *pUserData);
