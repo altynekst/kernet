@@ -5069,12 +5069,12 @@ void CGameClient::RenderKinetixLaserUnfreezeAttempt()
 // ============================================================
 // Melancholy: Close-range avoid
 // ============================================================
-void CGameClient::DoCloseAvoidInput(CNetObj_PlayerInput &In)
+void CGameClient::DoCloseAvoidInput(CNetObj_PlayerInput &In, int Conn)
 {
 	if(!g_Config.m_ClZzAvoidClose)
 		return;
 
-	const int LocalId = m_Snap.m_LocalClientId;
+	const int LocalId = (Conn >= 0 && Conn < NUM_DUMMIES) ? m_aLocalIds[Conn] : m_Snap.m_LocalClientIdm_Snap.m_LocalClientId;
 	if(LocalId < 0 || LocalId >= MAX_CLIENTS)
 		return;
 
@@ -9845,7 +9845,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 		Out.m_TargetY = (int)Aim.y;
 		m_DummyInput = Out;
 		m_Controls.m_aInputData[Conn] = Out;
-		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
+		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 		mem_copy(pData, &Out, sizeof(Out));
 		return sizeof(Out);
 	}
@@ -9920,7 +9920,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				Out.m_Hook = HookBit ? 1 : 0;
 				if(JumpBit)
 					Out.m_Jump = (Out.m_Jump + 2) | 1;
-				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
+				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 				mem_copy(pData, &Out, sizeof(Out));
 				return sizeof(Out);
 			}
@@ -9990,7 +9990,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 			if(!Force && !Out.m_Direction && !Out.m_Jump && !Out.m_Hook &&
 				!Out.m_Fire)
 				return 0;
-			if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
+			if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 			mem_copy(pData, &Out, sizeof(Out));
 			return sizeof(Out);
 		}
@@ -10254,7 +10254,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				if(JumpBit)
 					Out.m_Jump = (Out.m_Jump + 2) | 1;
 
-				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
+				if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 				mem_copy(pData, &Out, sizeof(Out));
 				return sizeof(Out);
 			}
@@ -10358,7 +10358,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				}
 			}
 		}
-		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out);
+		if(g_Config.m_ClZzAvoidClose) DoCloseAvoidInput(Out, Conn);
 		mem_copy(pData, &Out, sizeof(Out));
 		return sizeof(Out);
 	}
