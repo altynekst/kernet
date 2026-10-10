@@ -636,7 +636,68 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			Inner.HSplitTop(LineSize, &Button, &Inner);
 			Ui()->DoScrollbarOption(&g_Config.m_TcSpoofDDNetVersion, &g_Config.m_TcSpoofDDNetVersion, &Button, Localize("DDNet Version"), 0, 99999);
 		}
-				CUIRect ContentEnd = MainView;
+				{
+					CUIRect Inner;
+					DoFeaturePanel(LeftView, 200.0f, Localize("Dummy Manager"), Inner);
+				
+					// 3 кнопки переключения: Main / Dummy 1 / Dummy 2
+					CUIRect Row;
+					Inner.HSplitTop(LineSize, &Row, &Inner);
+					CUIRect B0, B1, B2;
+					Row.VSplitLeft(Row.w / 3.0f, &B0, &Row);
+					Row.VSplitLeft(Row.w / 2.0f, &B1, &B2);
+					B0.HMargin(1.0f, &B0);
+					B1.HMargin(1.0f, &B1);
+					B2.HMargin(1.0f, &B2);
+					static CButtonContainer s_DummyMainBtn, s_Dummy1Btn, s_Dummy2Btn;
+				
+					const bool IsMain = (g_Config.m_ClDummy == IClient::CONN_MAIN);
+					const bool IsDummy1 = (g_Config.m_ClDummy == IClient::CONN_DUMMY);
+					const bool IsDummy2 = (g_Config.m_ClDummy == IClient::CONN_DUMMY2);
+				
+					if(DoButton_MenuTab(&s_DummyMainBtn, Localize("Main"), IsMain, &B0, IGraphics::CORNER_ALL, nullptr, nullptr, nullptr, nullptr, 12.0f))
+						g_Config.m_ClDummy = IClient::CONN_MAIN;
+				
+					const bool Dummy1Avail = Client()->DummyConnected(IClient::CONN_DUMMY);
+					if(DoButton_MenuTab(&s_Dummy1Btn, Dummy1Avail ? Localize("Dummy 1") : Localize("Dummy 1 (off)"), IsDummy1, &B1, IGraphics::CORNER_ALL, nullptr, nullptr, nullptr, nullptr, 12.0f) && Dummy1Avail)
+						g_Config.m_ClDummy = IClient::CONN_DUMMY;
+				
+					const bool Dummy2Avail = Client()->DummyConnected(IClient::CONN_DUMMY2);
+					if(DoButton_MenuTab(&s_Dummy2Btn, Dummy2Avail ? Localize("Dummy 2") : Localize("Dummy 2 (off)"), IsDummy2, &B2, IGraphics::CORNER_ALL, nullptr, nullptr, nullptr, nullptr, 12.0f) && Dummy2Avail)
+						g_Config.m_ClDummy = IClient::CONN_DUMMY2;
+				
+					// Кнопка подключения/отключения Dummy 2
+					Inner.HSplitTop(LineSize, &Row, &Inner);
+					static CButtonContainer s_Dummy2ConnectBtn;
+					if(Dummy2Avail)
+					{
+						if(DoButton_Menu(&s_Dummy2ConnectBtn, Localize("Disconnect Dummy 2"), 0, &Row))
+						{
+							Client()->DummyDisconnect(nullptr, IClient::CONN_DUMMY2);
+							if(g_Config.m_ClDummy == IClient::CONN_DUMMY2)
+								g_Config.m_ClDummy = IClient::CONN_MAIN;
+						}
+					}
+					else if(Client()->DummyConnecting(IClient::CONN_DUMMY2))
+					{
+						DoButton_Menu(&s_Dummy2ConnectBtn, Localize("Connecting Dummy 2..."), 1, &Row);
+					}
+					else
+					{
+						const bool Dummy1Ok = Client()->DummyConnected(IClient::CONN_DUMMY) || Client()->DummyConnecting(IClient::CONN_DUMMY);
+						if(DoButton_Menu(&s_Dummy2ConnectBtn, Localize("Connect Dummy 2"), Dummy1Ok ? 0 : 1, &Row) && Dummy1Ok)
+							Client()->DummyConnect(IClient::CONN_DUMMY2);
+					}
+				
+					// Строка статуса
+					Inner.HSplitTop(LineSize, &Label, &Inner);
+					char aStatus[128];
+					str_format(aStatus, sizeof(aStatus), "Dummy 1: %s | Dummy 2: %s",
+						Dummy1Avail ? "Connected" : "Offline",
+						Dummy2Avail ? "Connected" : (Client()->DummyConnecting(IClient::CONN_DUMMY2) ? "Connecting" : "Offline"));
+					Ui()->DoLabel(&Label, aStatus, 12.0f, TEXTALIGN_ML);
+				}
+								CUIRect ContentEnd = MainView;
 		ContentEnd.y = maximum(LeftView.y, RightView.y);
 		ContentEnd.h = 0.0f;
 		s_MiscScrollRegion.AddRect(ContentEnd);

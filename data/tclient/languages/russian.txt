@@ -1550,3 +1550,30 @@ Full Version String
 DDNet Version
 == Версия DDNet
 
+Dummy Manager
+== Менеджер дамми
+
+Main
+== Основной
+
+Dummy 1
+== Дамми 1
+
+Dummy 1 (off)
+== Дамми 1 (выкл)
+
+Dummy 2
+== Дамми 2
+
+Dummy 2 (off)
+== Дамми 2 (выкл)
+
+Connect Dummy 2
+== Подключить дамми 2
+
+Disconnect Dummy 2
+== Отключить дамми 2
+
+Connecting Dummy 2...
+== Подключение дамми 2...
+
