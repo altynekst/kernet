@@ -5078,39 +5078,47 @@ void CGameClient::DoCloseAvoidInput(CNetObj_PlayerInput &In)
 	if(LocalId < 0 || LocalId >= MAX_CLIENTS)
 		return;
 
+	// Получаем позицию, скорость и контекст
 	const vec2 Pos = m_aClients[LocalId].m_RegularPredicted.m_Pos;
+	const vec2 Vel = m_aClients[LocalId].m_RegularPredicted.m_Vel;
 
-	auto IsFreeze = [&](float dx, float dy) -> bool {
-		const int x = (int)(Pos.x + dx);
-		const int y = (int)(Pos.y + dy);
-		const int T = Collision()->GetTile(x, y);
-		const int FT = Collision()->GetFrontTile(x, y);
-		return T == TILE_FREEZE || T == TILE_DFREEZE || T == TILE_LFREEZE ||
-		       FT == TILE_FREEZE || FT == TILE_DFREEZE || FT == TILE_LFREEZE;
+	// Team через m_Teams, Switchers через m_PredictedWorld
+	const int Team = m_Teams.Team(LocalId);
+	const std::vector<SSwitchers> *pSwitchers = &m_PredictedWorld.Switchers();
+
+	// Лямбда проверки фриза в точке
+	auto IsFreezeAt = [&](const vec2 &P) -> bool {
+		return DmdIsFreezeAtPoint(Collision(), P, pSwitchers, Team);
 	};
 
-	const float R = 32.0f;
-	const bool L = IsFreeze(-R, 0.0f);
-	const bool Rr = IsFreeze(R, 0.0f);
-	const bool U = IsFreeze(0.0f, -R);
-	const bool D = IsFreeze(0.0f, R);
+	// 1. Предсказание позиции через N тиков
+	const int PredictTicks = std::clamp(g_Config.m_ClZzAvoidClosePredict, 1, 30);
+	const vec2 PredictedPos = Pos + Vel * ((float)PredictTicks / 50.0f);
 
-	// Ð¤ÑÐ¸Ð· Ð¿Ð¾Ð´ Ð½Ð¾Ð³Ð°Ð¼Ð¸ -> Ð¿ÑÑÐ¶Ð¾Ðº
-	if(D && g_Config.m_ClZzAvoidCloseJump && (In.m_Jump & 1) == 0)
+	// 2. Проверка фриза в направлении движения (1 тайл вперёд) + предсказанная позиция
+	const int Dir = In.m_Direction;
+	const bool FreezeInDir =
+		(Dir > 0 && (IsFreezeAt(Pos + vec2(32.0f, 0.0f)) || IsFreezeAt(PredictedPos))) ||
+		(Dir < 0 && (IsFreezeAt(Pos + vec2(-32.0f, 0.0f)) || IsFreezeAt(PredictedPos)));
+
+	// 3. Торможение или стоп
+	if(FreezeInDir)
+	{
+		const float SpeedX = fabsf(Vel.x);
+		const float SpeedLimit = (float)std::clamp(g_Config.m_ClZzAvoidCloseSpeed, 0, 20);
+		if(SpeedX > SpeedLimit)
+			In.m_Direction = (Dir > 0) ? -1 : 1;  // противоположное — тормозим
+		else
+			In.m_Direction = 0;                    // стоп
+	}
+
+	// 4. Фриз под ногами — прыжок
+	if(g_Config.m_ClZzAvoidCloseJump && IsFreezeAt(Pos + vec2(0.0f, 32.0f)))
 		In.m_Jump = ((In.m_Jump + 2) | 1) & INPUT_STATE_MASK;
 
-	// Ð¤ÑÐ¸Ð· Ð² Ð½Ð°Ð¿ÑÐ°Ð²Ð»ÐµÐ½Ð¸Ð¸ -> ÑÑÐ¾Ð¿
-	if(g_Config.m_ClZzAvoidCloseSides &&
-	   ((In.m_Direction == -1 && L) || (In.m_Direction == 1 && Rr)))
-		In.m_Direction = 0;
-
-	// Ð¤ÑÐ¸Ð· ÑÐ²ÐµÑÑÑ -> Ð½Ðµ Ð¿ÑÑÐ³Ð°ÐµÐ¼
-	if(U && (In.m_Jump & 1))
+	// 5. Фриз сверху — не прыгаем
+	if(IsFreezeAt(Pos + vec2(0.0f, -32.0f)) && (In.m_Jump & 1))
 		In.m_Jump = 0;
-
-	// Ð¤ÑÐ¸Ð· Ñ Ð´Ð²ÑÑ ÑÑÐ¾ÑÐ¾Ð½ -> ÑÑÐ¾Ð¸Ð¼
-	if(g_Config.m_ClZzAvoidCloseSides && L && Rr)
-		In.m_Direction = 0;
 }
 
 int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)

@@ -898,6 +898,13 @@ MACRO_CONFIG_INT(ClZzAvoidCloseJump, cl_zz_avoid_close_jump, 1, 0, 1,
 MACRO_CONFIG_INT(ClZzAvoidCloseSides, cl_zz_avoid_close_sides, 1, 0, 1,
         CFGFLAG_CLIENT | CFGFLAG_SAVE,
         "Avoid New: stop movement if freeze is on the side")
+
+MACRO_CONFIG_INT(ClZzAvoidClosePredict, cl_zz_avoid_close_predict, 8, 1, 30,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid New: predict this many ticks ahead for freeze detection")
+MACRO_CONFIG_INT(ClZzAvoidCloseSpeed, cl_zz_avoid_close_speed, 3, 0, 20,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid New: speed threshold to brake instead of stop")
 MACRO_CONFIG_INT(ClKnTileAlign, cl_kn_05, 0, 0, 1,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_HIDDEN,
 	"Align tee to the configured sub-tile X coordinate while held")

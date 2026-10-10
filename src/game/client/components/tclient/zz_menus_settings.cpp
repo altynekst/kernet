@@ -1436,13 +1436,22 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Left, 110.0f, Localize("Avoid New"), Inner);
+			DoFeaturePanel(Left, 210.0f, Localize("Avoid New"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidClose,
 				Localize("Close-range avoid"), &g_Config.m_ClZzAvoidClose, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidCloseJump,
 				Localize("Auto-jump under feet"), &g_Config.m_ClZzAvoidCloseJump, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzAvoidCloseSides,
 				Localize("Stop on sides"), &g_Config.m_ClZzAvoidCloseSides, &Inner, LineSize);
+			CUIRect Button;
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidClosePredict,
+				&g_Config.m_ClZzAvoidClosePredict, &Button,
+				Localize("Predict ticks"), 1, 30);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidCloseSpeed,
+				&g_Config.m_ClZzAvoidCloseSpeed, &Button,
+				Localize("Speed threshold"), 0, 20);
 		}
 
 		{
