@@ -9396,6 +9396,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 				static bool s_aAutoHitFireInitialized[NUM_DUMMIES] = {false, false, false};
 				static int s_aAutoAledCooldownUntil[NUM_DUMMIES] = {0};
 				static bool s_aAutoAledInjected[NUM_DUMMIES] = {false, false, false};
+                                static bool s_aAutoAledSwitchPending[NUM_DUMMIES] = {false, false, false};
 				static int s_aAutoAledInjectedTick[NUM_DUMMIES] = {-1, -1, -1};
 				static vec2 s_aAutoAledInjectedDir[NUM_DUMMIES] = {
 					vec2(1.0f, 0.0f), vec2(1.0f, 0.0f), vec2(1.0f, 0.0f)};
@@ -9654,17 +9655,37 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 					// Auto-ALED should always remain silent (no camera/mouse snap).
 					if(!g_Config.m_ClZzHammerAssistSilent && !FoundByAutoAled)
 						m_Controls.m_aMousePos[DummyIndex] = BestDir * 1000.0f;
-					if(FoundByAutoAled)
+					const bool AlreadyHammer =
+
+					        m_Snap.m_pLocalCharacter &&
+
+					        m_Snap.m_pLocalCharacter->m_Weapon == WEAPON_HAMMER;
+
+
+					if(FoundByAutoAled && !AlreadyHammer &&
+
+					        !s_aAutoAledSwitchPending[DummyIndex])
+
 					{
-						// Arm the hammer as soon as a valid tee is behind the freeze band.
-						// This also handles servers where switching and firing in the same
-						// packet is less reliable than stock DDNet.
-						pInput->m_WantedWeapon = WEAPON_HAMMER + 1;
-						pInput->m_NextWeapon = 0;
-						pInput->m_PrevWeapon = 0;
+
+					        // Отправляем переключение на хаммер отдельно от fire.
+
+					        pInput->m_WantedWeapon = WEAPON_HAMMER + 1;
+
+					        pInput->m_NextWeapon = 0;
+
+					        pInput->m_PrevWeapon = 0;
+
+					        s_aAutoAledSwitchPending[DummyIndex] = true;
+
 					}
 
-					if(HammerReady && HammerAllowed)
+					const bool CanFireNow = HammerReady ||
+
+					        (s_aAutoAledSwitchPending[DummyIndex] && AlreadyHammer);
+
+
+					if(CanFireNow && HammerAllowed)
 					{
 						int Fire = s_aAutoHitFire[DummyIndex] & INPUT_STATE_MASK;
 						// Generate a canonical released->pressed transition and keep it
