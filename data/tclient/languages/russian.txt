@@ -1607,3 +1607,6 @@ Sensitivity x5 boost
 Fast fire (hammer + laser)
 == Быстрый огонь (хаммер + лазер)
 
+Fast fire delay
+== Задержка Fast fire
+

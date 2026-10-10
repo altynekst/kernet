@@ -940,6 +940,10 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		DoButton_CheckBoxAutoVMarginAndSet(
 			&g_Config.m_ClZzFngFastFire, Localize("Fast fire (hammer + laser)"),
 			&g_Config.m_ClZzFngFastFire, &Inner, LineSize);
+		Inner.HSplitTop(LineSize, &Button, &Inner);
+		Ui()->DoScrollbarOption(&g_Config.m_ClZzFngFastFireDelay,
+			&g_Config.m_ClZzFngFastFireDelay, &Button,
+			Localize("Fast fire delay"), 1, 30);
 		DoButton_CheckBoxAutoVMarginAndSet(
 			&g_Config.m_ClZzFngDebug, Localize("Debug logging"),
 			&g_Config.m_ClZzFngDebug, &Inner, LineSize);
