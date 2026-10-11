@@ -429,6 +429,9 @@ int CControls::SnapInput(int *pData)
 		static int s_aFastFireStage[NUM_DUMMIES] = {0, 0, 0};
 
 		static int s_aFastFireWait[NUM_DUMMIES] = {0, 0, 0};
+		static int s_aFastFireTargetId[NUM_DUMMIES] = {-1, -1, -1};
+		static bool s_aFastFireWasFrozen[NUM_DUMMIES] = {false, false, false};
+		static int s_aFastFireCheckTick[NUM_DUMMIES] = {0, 0, 0};
 		const int FngDummyIndex = g_Config.m_ClDummy;
 		m_ZzFngDecisionValid = false;
 		if((g_Config.m_ClZzFngTriggerLaser || g_Config.m_ClZzFngAutoLaser || g_Config.m_ClZzFngAimOnFire || g_Config.m_ClZzFngFastFire) && FngDummyIndex == 0 && GameClient()->m_Snap.m_pLocalCharacter && !GameClient()->m_Snap.m_SpecInfo.m_Active)
@@ -1001,7 +1004,8 @@ int CControls::SnapInput(int *pData)
 				}
 
 				// ============================================================
-				// Fast Fire (independent): laser -> hammer -> hit -> laser -> shot
+				// Fast Fire v6: лазер -> хаммер -> удар -> задержка -> лазер -> выстрел
+				// При промахе — повтор цикла. Пока не попадёт в цель.
 				// ============================================================
 				if(g_Config.m_ClZzFngFastFire && TriggerFound)
 				{
@@ -1013,9 +1017,20 @@ int CControls::SnapInput(int *pData)
 						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
 						const bool HammerReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
 						const int DelayTicks = std::clamp(g_Config.m_ClZzFngFastFireDelay, 1, 30);
+						const int CheckTicks = 5;
+						const int NowTick = Client()->GameTick(FngDummyIndex);
+
 						switch(s_aFastFireStage[FngDummyIndex])
 						{
-						case 0:
+						case 0: // старт нового цикла
+							s_aFastFireTargetId[FngDummyIndex] = BestTriggerClientId;
+							if(BestTriggerClientId >= 0 && BestTriggerClientId < MAX_CLIENTS)
+							{
+								s_aFastFireWasFrozen[FngDummyIndex] =
+									GameClient()->m_aClients[BestTriggerClientId].m_FreezeEnd > NowTick ||
+									GameClient()->m_aClients[BestTriggerClientId].m_DeepFrozen ||
+									GameClient()->m_aClients[BestTriggerClientId].m_LiveFrozen;
+							}
 							if(CurrentIsHammer)
 							{
 								if(HammerReadyNow)
@@ -1031,7 +1046,7 @@ int CControls::SnapInput(int *pData)
 								s_aFastFireStage[FngDummyIndex] = 1;
 							}
 							break;
-						case 1:
+						case 1: // ждём хаммер
 							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
 							if(CurrentIsHammer && HammerReadyNow)
 							{
@@ -1040,21 +1055,21 @@ int CControls::SnapInput(int *pData)
 								s_aFastFireStage[FngDummyIndex] = 2;
 							}
 							break;
-						case 2:
+						case 2: // ждём анимацию удара
 							if(s_aFastFireWait[FngDummyIndex] > 0)
 								s_aFastFireWait[FngDummyIndex]--;
 							else
 								s_aFastFireStage[FngDummyIndex] = 3;
 							break;
-						case 3:
+						case 3: // переключаемся на лазер
 							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
 							s_aFastFireStage[FngDummyIndex] = 4;
 							break;
-						case 4:
+						case 4: // ждём лазер
 							if(CurrentIsLaser && LaserReadyNow)
 								s_aFastFireStage[FngDummyIndex] = 5;
 							break;
-						case 5:
+						case 5: // выстрел
 							if(CurrentIsLaser && LaserReadyNow)
 							{
 								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
@@ -1066,25 +1081,64 @@ int CControls::SnapInput(int *pData)
 									m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
 									s_aFngLaserReleasePending[FngDummyIndex] = true;
 									s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
+									s_aFastFireCheckTick[FngDummyIndex] = NowTick + CheckTicks;
 									s_aFastFireStage[FngDummyIndex] = 6;
 								}
 							}
 							break;
-						case 6:
-							if(!s_aFngLaserReleasePending[FngDummyIndex])
+						case 6: // ждём проверки
+							if(NowTick >= s_aFastFireCheckTick[FngDummyIndex])
 								s_aFastFireStage[FngDummyIndex] = 7;
 							break;
-						case 7:
-							s_aFastFireStage[FngDummyIndex] = 0;
-							s_aFastFireWait[FngDummyIndex] = 0;
+						case 7: // проверка попадания
+							{
+								const int TargetId = s_aFastFireTargetId[FngDummyIndex];
+								bool IsFrozenNow = false;
+								if(TargetId >= 0 && TargetId < MAX_CLIENTS)
+								{
+									IsFrozenNow =
+										GameClient()->m_aClients[TargetId].m_FreezeEnd > NowTick ||
+										GameClient()->m_aClients[TargetId].m_DeepFrozen ||
+										GameClient()->m_aClients[TargetId].m_LiveFrozen;
+								}
+								const bool Changed = (IsFrozenNow != s_aFastFireWasFrozen[FngDummyIndex]);
+								// Если состояние цели изменилось (заморозилась / разморозилась) — попал.
+								// Иначе — промазал, повторяем цикл.
+								if(Changed)
+								{
+									// Попал — полный сброс
+									s_aFastFireStage[FngDummyIndex] = 0;
+									s_aFastFireWait[FngDummyIndex] = 0;
+									s_aFastFireTargetId[FngDummyIndex] = -1;
+								}
+								else
+								{
+									// Промазал — повтор цикла (но не запоминаем состояние заново)
+									s_aFastFireStage[FngDummyIndex] = (CurrentIsHammer ? 2 : 1);
+									if(CurrentIsHammer && HammerReadyNow)
+									{
+										m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+										s_aFastFireWait[FngDummyIndex] = DelayTicks;
+										s_aFastFireStage[FngDummyIndex] = 2;
+									}
+									else
+									{
+										m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
+										s_aFastFireStage[FngDummyIndex] = 1;
+									}
+								}
+							}
 							break;
 						default:
 							s_aFastFireStage[FngDummyIndex] = 0;
 							s_aFastFireWait[FngDummyIndex] = 0;
+							s_aFastFireTargetId[FngDummyIndex] = -1;
 							break;
 						}
 					}
 				}
+
+
 
 
 				if(g_Config.m_ClZzFngDebug && (ManualAimShot || InjectedAutoShot || InjectedTriggerShot))
