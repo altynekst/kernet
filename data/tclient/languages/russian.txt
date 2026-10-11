@@ -1610,3 +1610,6 @@ Fast fire (hammer + laser)
 Fast fire delay
 == Задержка Fast fire
 
+Sensitivity x100 boost
+== Чувствительность ×100
+

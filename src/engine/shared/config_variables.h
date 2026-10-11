@@ -1769,6 +1769,10 @@ MACRO_CONFIG_INT(InpControllerSens, inp_controller_sens, 100, 1, 100000,
 MACRO_CONFIG_INT(ClZzSensBoost, cl_zz_sens_boost, 0, 0, 1,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"Multiply mouse/controller sensitivity by 5x")
+
+MACRO_CONFIG_INT(ClZzSensBoost100, cl_zz_sens_boost_100, 0, 0, 1,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Multiply mouse/controller sensitivity by 100x")
 MACRO_CONFIG_INT(InpControllerX, inp_controller_x, 0, 0, 12,
 	CFGFLAG_SAVE | CFGFLAG_CLIENT,
 	"Controller axis that controls X axis of cursor")
