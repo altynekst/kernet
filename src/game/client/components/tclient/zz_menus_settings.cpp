@@ -290,6 +290,18 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidTriggerTicks,
 				&g_Config.m_ClZzAvoidTriggerTicks, &Button,
 				Localize("Trigger ticks"), 1, 20);
+
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidRescueAggression,
+				&g_Config.m_ClZzAvoidRescueAggression, &Button,
+				Localize("Rescue aggression"), 0, 100);
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_ClZzAvoidKogProfile, Localize("KOG profile"),
+				&g_Config.m_ClZzAvoidKogProfile, &Inner, LineSize);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidAggressiveProfile,
+				&g_Config.m_ClZzAvoidAggressiveProfile, &Button,
+				Localize("Aggressive profile"), 0, 2);
 			Inner.HSplitTop(5.0f, nullptr, &Inner);
 			Inner.HSplitTop(LineSize, &Label, &Inner);
 			Ui()->DoLabel(&Label, Localize("Avoid toggle keybind"), 14.0f,
