@@ -984,78 +984,6 @@ int CControls::SnapInput(int *pData)
 						InjectedAutoShot = true;
 					}
 				}
-				else if(g_Config.m_ClZzFngFastFire && TriggerFound)
-				{
-					const CNetObj_Character *pFfChar = GameClient()->m_Snap.m_pLocalCharacter;
-					if(pFfChar)
-					{
-						const bool CurrentIsHammer = pFfChar->m_Weapon == WEAPON_HAMMER;
-						const bool CurrentIsLaser = pFfChar->m_Weapon == WEAPON_LASER;
-						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
-						const int DelayTicks = std::clamp(g_Config.m_ClZzFngFastFireDelay, 1, 30);
-						switch(s_aFastFireStage[FngDummyIndex])
-						{
-						case 0: // старт
-							if(CurrentIsHammer)
-							{
-								// хаммер в руках -> удар
-								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
-								s_aFastFireWait[FngDummyIndex] = DelayTicks;
-								s_aFastFireStage[FngDummyIndex] = 2;
-							}
-							else
-							{
-								// лазер или другое -> сначала хаммер
-								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
-								s_aFastFireStage[FngDummyIndex] = 1;
-							}
-							break;
-						case 1: // ждём хаммер в руках
-							if(CurrentIsHammer)
-							{
-								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
-								s_aFastFireWait[FngDummyIndex] = DelayTicks;
-								s_aFastFireStage[FngDummyIndex] = 2;
-							}
-							break;
-						case 2: // ждём анимацию удара
-							if(s_aFastFireWait[FngDummyIndex] > 0)
-								s_aFastFireWait[FngDummyIndex]--;
-							else
-								s_aFastFireStage[FngDummyIndex] = 3;
-							break;
-						case 3: // переключаемся на лазер
-							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
-							s_aFastFireStage[FngDummyIndex] = 4;
-							break;
-						case 4: // ждём лазер в руках
-							if(CurrentIsLaser)
-								s_aFastFireStage[FngDummyIndex] = 5;
-							break;
-						case 5: // выстрел
-							if(LaserReadyNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
-							{
-								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
-								m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
-								if(!m_aInputData[FngDummyIndex].m_TargetX && !m_aInputData[FngDummyIndex].m_TargetY)
-									m_aInputData[FngDummyIndex].m_TargetX = 1;
-								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
-								s_aFngLaserReleasePending[FngDummyIndex] = true;
-								s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
-								s_aFastFireStage[FngDummyIndex] = 6;
-							}
-							break;
-						case 6: // сброс
-							s_aFastFireStage[FngDummyIndex] = 0;
-							s_aFastFireWait[FngDummyIndex] = 0;
-							break;
-						default:
-							s_aFastFireStage[FngDummyIndex] = 0;
-							s_aFastFireWait[FngDummyIndex] = 0;
-							break;
-						}
-					}
-				}
 				else if(!g_Config.m_ClZzFngFastFire && g_Config.m_ClZzFngTriggerLaser && !AimOnFire && TriggerFound && CanShootNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
 				{
 					m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
@@ -1071,6 +999,93 @@ int CControls::SnapInput(int *pData)
 				{
 					s_aFngLaserSwitchKeepTicks[FngDummyIndex] = 0;
 				}
+
+				// ============================================================
+				// Fast Fire (independent): laser -> hammer -> hit -> laser -> shot
+				// ============================================================
+				if(g_Config.m_ClZzFngFastFire && TriggerFound)
+				{
+					const CNetObj_Character *pFfChar = GameClient()->m_Snap.m_pLocalCharacter;
+					if(pFfChar)
+					{
+						const bool CurrentIsHammer = pFfChar->m_Weapon == WEAPON_HAMMER;
+						const bool CurrentIsLaser = pFfChar->m_Weapon == WEAPON_LASER;
+						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
+						const bool HammerReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
+						const int DelayTicks = std::clamp(g_Config.m_ClZzFngFastFireDelay, 1, 30);
+						switch(s_aFastFireStage[FngDummyIndex])
+						{
+						case 0:
+							if(CurrentIsHammer)
+							{
+								if(HammerReadyNow)
+								{
+									m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+									s_aFastFireWait[FngDummyIndex] = DelayTicks;
+									s_aFastFireStage[FngDummyIndex] = 2;
+								}
+							}
+							else
+							{
+								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
+								s_aFastFireStage[FngDummyIndex] = 1;
+							}
+							break;
+						case 1:
+							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
+							if(CurrentIsHammer && HammerReadyNow)
+							{
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireWait[FngDummyIndex] = DelayTicks;
+								s_aFastFireStage[FngDummyIndex] = 2;
+							}
+							break;
+						case 2:
+							if(s_aFastFireWait[FngDummyIndex] > 0)
+								s_aFastFireWait[FngDummyIndex]--;
+							else
+								s_aFastFireStage[FngDummyIndex] = 3;
+							break;
+						case 3:
+							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
+							s_aFastFireStage[FngDummyIndex] = 4;
+							break;
+						case 4:
+							if(CurrentIsLaser && LaserReadyNow)
+								s_aFastFireStage[FngDummyIndex] = 5;
+							break;
+						case 5:
+							if(CurrentIsLaser && LaserReadyNow)
+							{
+								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
+								m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
+								if(!m_aInputData[FngDummyIndex].m_TargetX && !m_aInputData[FngDummyIndex].m_TargetY)
+									m_aInputData[FngDummyIndex].m_TargetX = 1;
+								if((m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
+								{
+									m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+									s_aFngLaserReleasePending[FngDummyIndex] = true;
+									s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
+									s_aFastFireStage[FngDummyIndex] = 6;
+								}
+							}
+							break;
+						case 6:
+							if(!s_aFngLaserReleasePending[FngDummyIndex])
+								s_aFastFireStage[FngDummyIndex] = 7;
+							break;
+						case 7:
+							s_aFastFireStage[FngDummyIndex] = 0;
+							s_aFastFireWait[FngDummyIndex] = 0;
+							break;
+						default:
+							s_aFastFireStage[FngDummyIndex] = 0;
+							s_aFastFireWait[FngDummyIndex] = 0;
+							break;
+						}
+					}
+				}
+
 
 				if(g_Config.m_ClZzFngDebug && (ManualAimShot || InjectedAutoShot || InjectedTriggerShot))
 				{
