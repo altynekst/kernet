@@ -215,15 +215,22 @@ namespace
 	bool DmdSegmentTouchesFreeze(CCollision *pCollision, const vec2 &From,
 		const vec2 &To,
 		const std::vector<SSwitchers> *pSwitchers,
-		int Team)
+		int Team, bool IncludeTeeRadius = false)
 	{
-		const int Steps = std::clamp((int)ceilf(distance(From, To) / 16.0f), 1, 8);
+		const int Steps = std::clamp((int)ceilf(distance(From, To) /
+			(IncludeTeeRadius ? 8.0f : 16.0f)), 1, 256);
+		bool WasNearFreeze = IncludeTeeRadius &&
+			DmdIsFreezeNearTee(pCollision, From, pSwitchers, Team);
 		for(int StepIndex = 1; StepIndex <= Steps; StepIndex++)
 		{
-			if(DmdIsFreezeAtPoint(pCollision,
-				   mix(From, To, (float)StepIndex / (float)Steps),
-				   pSwitchers, Team))
+			const vec2 Sample = mix(From, To, (float)StepIndex / (float)Steps);
+			const bool CenterInFreeze = DmdIsFreezeAtPoint(pCollision,
+				Sample, pSwitchers, Team);
+			const bool NearFreeze = IncludeTeeRadius &&
+				DmdIsFreezeNearTee(pCollision, Sample, pSwitchers, Team);
+			if(CenterInFreeze || (NearFreeze && !WasNearFreeze))
 				return true;
+			WasNearFreeze = NearFreeze;
 		}
 		return false;
 	}
