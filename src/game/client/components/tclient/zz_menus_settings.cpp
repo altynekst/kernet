@@ -55,10 +55,10 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 	CUIRect TabBar, Button;
 	MainView.HSplitTop(26.0f, &TabBar, &MainView);
 	const float TabWidth = TabBar.w / 8.0f;
-	const char *apTabNames[] = {Localize("Aimbot"), Localize("Gores"),
-		Localize("Misc"), Localize("Fly"),
-		Localize("FNG"), Localize("Visuals"),
-		"Recording", Localize("Avoid New")};
+	const char *apTabNames[] = {Localize("Aimbot"), Localize("Avoid New"),
+                Localize("Misc"), Localize("Fly"),
+                Localize("FNG"), Localize("Visuals"),
+                "Recording"};
 	if(s_SubTab >= 8)
 		s_SubTab = 0;
 	for(int i = 0; i < 8; i++)

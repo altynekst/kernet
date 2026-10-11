@@ -1619,3 +1619,12 @@ Fake Aim
 Show me
 == Показывать у себя
 
+Rescue aggression
+== Агрессия спасения
+
+KOG profile
+== Профиль KOG
+
+Aggressive profile
+== Агрессивный профиль
+
