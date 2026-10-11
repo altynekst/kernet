@@ -483,8 +483,8 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSensBoost,
 				Localize("Sensitivity x5 boost"), &g_Config.m_ClZzSensBoost,
 				&Inner, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSensBoost100,
-				Localize("Sensitivity x100 boost"), &g_Config.m_ClZzSensBoost100,
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSensBoost5000,
+				Localize("Sensitivity x5000 boost"), &g_Config.m_ClZzSensBoost5000,
 				&Inner, LineSize);
 			Inner.HSplitTop(8.0f, nullptr, &Inner);
 			Inner.HSplitTop(LineSize, &Label, &Inner);

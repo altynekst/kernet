@@ -1406,8 +1406,8 @@ bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)
 	// Melancholy: множитель ×5
 	if(g_Config.m_ClZzSensBoost)
 		Factor *= 5.0f;
-	if(g_Config.m_ClZzSensBoost100)
-		Factor *= 100.0f;
+	if(g_Config.m_ClZzSensBoost5000)
+		Factor *= 5000.0f;
 
 	if(GameClient()->m_Snap.m_SpecInfo.m_Active && GameClient()->m_Snap.m_SpecInfo.m_SpectatorId < 0)
 		Factor *= GameClient()->m_Camera.m_Zoom;
