@@ -1007,7 +1007,7 @@ int CControls::SnapInput(int *pData)
 				// Fast Fire v7: лазер -> хаммер -> удар -> задержка -> лазер -> выстрел
 				// Повторяется пока враг в прицеле. Простая логика без проверки попадания.
 				// ============================================================
-				if(g_Config.m_ClZzFngFastFire && TriggerFound)
+				if(g_Config.m_ClZzFngFastFire && TriggerFound && !IsFrozen(LocalId))
 				{
 					const CNetObj_Character *pFfChar = GameClient()->m_Snap.m_pLocalCharacter;
 					if(pFfChar)
@@ -1065,7 +1065,7 @@ int CControls::SnapInput(int *pData)
 								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
 								s_aFngLaserReleasePending[FngDummyIndex] = true;
 								s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
-								s_aFastFireWait[FngDummyIndex] = 5;
+								s_aFastFireWait[FngDummyIndex] = 10;
 								s_aFastFireStage[FngDummyIndex] = 4;
 							}
 							break;
