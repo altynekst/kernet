@@ -1613,3 +1613,6 @@ Fast fire delay
 Sensitivity x5000 boost
 == Чувствительность ×5000
 
+Fake Aim
+== Fake Aim
+
