@@ -9757,7 +9757,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 			if(AvoidLocalId >= 0 && AvoidAllowed)
 			{
 				bool FinalAvoidOverride = false;
-				ApplyAvoid(pInput, AvoidDummyIndex, AvoidLocalId, false,
+				ApplyAvoid(pInput, AvoidDummyIndex, AvoidLocalId,
 					FinalAvoidOverride);
 			}
 			ApplyKinetixLaserUnfreeze(pInput, AvoidDummyIndex,

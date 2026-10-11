@@ -353,7 +353,8 @@ private:
 		const vec2 &DummyVel, const vec2 &Goal,
 		int &OutAction);
 	void FentBotTrainUpdate();
-	bool ApplyAvoid(CNetObj_PlayerInput *pInput, int DummyIndex, int LocalId, bool AimOwnedByAction, bool &OverrodeInput);
+	bool ApplyAvoid(CNetObj_PlayerInput *pInput, int DummyIndex,
+		int LocalId, bool &OverrodeInput);
 	bool ApplyKinetixLaserUnfreeze(CNetObj_PlayerInput *pInput, int DummyIndex,
 		int LocalId);
 	void ResetKinetixLaserUnfreeze();
