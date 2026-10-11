@@ -431,7 +431,7 @@ int CControls::SnapInput(int *pData)
 		static int s_aFastFireWait[NUM_DUMMIES] = {0, 0, 0};
 		const int FngDummyIndex = g_Config.m_ClDummy;
 		m_ZzFngDecisionValid = false;
-		if((g_Config.m_ClZzFngTriggerLaser || g_Config.m_ClZzFngAutoLaser || g_Config.m_ClZzFngAimOnFire) && FngDummyIndex == 0 && GameClient()->m_Snap.m_pLocalCharacter && !GameClient()->m_Snap.m_SpecInfo.m_Active)
+		if((g_Config.m_ClZzFngTriggerLaser || g_Config.m_ClZzFngAutoLaser || g_Config.m_ClZzFngAimOnFire || g_Config.m_ClZzFngFastFire) && FngDummyIndex == 0 && GameClient()->m_Snap.m_pLocalCharacter && !GameClient()->m_Snap.m_SpecInfo.m_Active)
 		{
 			int LocalId = GameClient()->m_aLocalIds[FngDummyIndex];
 			if(LocalId < 0)
@@ -1056,7 +1056,7 @@ int CControls::SnapInput(int *pData)
 						}
 					}
 				}
-				else if(g_Config.m_ClZzFngTriggerLaser && !AimOnFire && TriggerFound && CanShootNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
+				else if(!g_Config.m_ClZzFngFastFire && g_Config.m_ClZzFngTriggerLaser && !AimOnFire && TriggerFound && CanShootNow && !ReleasedThisTick && (m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
 				{
 					m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
 					m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
