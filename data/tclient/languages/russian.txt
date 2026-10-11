@@ -1616,3 +1616,6 @@ Sensitivity x5000 boost
 Fake Aim
 == Fake Aim
 
+Show me
+== Показывать у себя
+

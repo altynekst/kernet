@@ -27,6 +27,7 @@ public:
 
 	vec2 m_aMousePos[NUM_DUMMIES];
 	vec2 m_aMousePosOnAction[NUM_DUMMIES];
+	vec2 m_aUnspunPos[NUM_DUMMIES];
 	vec2 m_aTargetPos[NUM_DUMMIES];
 
 	EMouseInputType m_aMouseInputType[NUM_DUMMIES];

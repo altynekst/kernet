@@ -1318,6 +1318,67 @@ int CControls::SnapInput(int *pData)
 
 	m_LastSendTime = time_get();
 	mem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));
+	// ============ Fake Aim spinbot (порт из aether-kn) ============
+	// Сохраняем реальную позицию, чтобы кручение её не сбивало
+	for(int UnspunD = 0; UnspunD < NUM_DUMMIES; UnspunD++)
+		m_aUnspunPos[UnspunD] = m_aMousePos[UnspunD];
+
+	if(g_Config.m_ClZzSpinAim && g_Config.m_ClZzSpinAimSpeed > 0)
+	{
+		const int SpinDummy = std::clamp(g_Config.m_ClDummy, 0, NUM_DUMMIES - 1);
+		static float s_aSpinAngle[NUM_DUMMIES] = {0.0f};
+		static int s_aSpinDir[NUM_DUMMIES] = {0};
+		auto SpinStep = [&](int D, bool TouchMouse) {
+			if(s_aSpinDir[D] == 0)
+				s_aSpinDir[D] = 1;
+			if(g_Config.m_ClZzSpinAimMode == 1)
+			{
+				if(rand() % 100 < 8)
+					s_aSpinDir[D] = -s_aSpinDir[D];
+			}
+			else
+			{
+				s_aSpinDir[D] = 1;
+			}
+			s_aSpinAngle[D] += (float)s_aSpinDir[D] * (float)std::clamp(g_Config.m_ClZzSpinAimSpeed, 0, 75) * 3.6f;
+			if(s_aSpinAngle[D] >= 360.0f)
+				s_aSpinAngle[D] -= 360.0f;
+			else if(s_aSpinAngle[D] < 0.0f)
+				s_aSpinAngle[D] += 360.0f;
+			const float SpinRad = s_aSpinAngle[D] * pi / 180.0f;
+			float SpinRadius = length(m_aMousePos[D]);
+			if(SpinRadius < 200.0f)
+				SpinRadius = 300.0f;
+			const vec2 Spun = vec2(std::cos(SpinRad), std::sin(SpinRad)) * SpinRadius;
+			if(TouchMouse && g_Config.m_ClZzSpinAimShowMe)
+			{
+				m_aMousePos[D] = Spun;
+				m_aMousePosOnAction[D] = Spun;
+			}
+			m_aInputData[D].m_TargetX = (int)Spun.x;
+			m_aInputData[D].m_TargetY = (int)Spun.y;
+		};
+		if(true)
+		{
+			const bool HoldAim = (m_aInputData[SpinDummy].m_Hook != 0) || ((m_aInputData[SpinDummy].m_Fire & 1) != 0);
+			if(HoldAim)
+			{
+				m_aInputData[SpinDummy].m_TargetX = (int)m_aMousePos[SpinDummy].x;
+				m_aInputData[SpinDummy].m_TargetY = (int)m_aMousePos[SpinDummy].y;
+			}
+			else
+				SpinStep(SpinDummy, true);
+		}
+		for(int D = 0; D < NUM_DUMMIES; D++)
+		{
+			if(D == SpinDummy)
+				continue;
+			if(D != 0 && !Client()->DummyConnected(D))
+				continue;
+			SpinStep(D, false);
+		}
+	}
+
 	return sizeof(m_aInputData[0]);
 }
 

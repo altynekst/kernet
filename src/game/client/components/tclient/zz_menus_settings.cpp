@@ -486,6 +486,17 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSensBoost5000,
 				Localize("Sensitivity x5000 boost"), &g_Config.m_ClZzSensBoost5000,
 				&Inner, LineSize);
+
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSpinAim,
+				Localize("Fake Aim"), &g_Config.m_ClZzSpinAim,
+				&Inner, LineSize);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzSpinAimSpeed,
+				&g_Config.m_ClZzSpinAimSpeed, &Button,
+				Localize("Speed"), 0, 75);
+			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClZzSpinAimShowMe,
+				Localize("Show me"), &g_Config.m_ClZzSpinAimShowMe,
+				&Inner, LineSize);
 			Inner.HSplitTop(8.0f, nullptr, &Inner);
 			Inner.HSplitTop(LineSize, &Label, &Inner);
 			Ui()->DoLabel(&Label, Localize("Companion"), 15.0f, TEXTALIGN_ML);

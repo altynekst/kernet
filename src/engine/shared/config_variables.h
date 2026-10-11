@@ -1773,6 +1773,13 @@ MACRO_CONFIG_INT(ClZzSensBoost, cl_zz_sens_boost, 0, 0, 1,
 MACRO_CONFIG_INT(ClZzSensBoost5000, cl_zz_sens_boost_5000, 0, 0, 1,
         CFGFLAG_CLIENT | CFGFLAG_SAVE,
         "Multiply mouse/controller sensitivity by 5000x")
+
+// Fake Aim spinbot
+MACRO_CONFIG_INT(ClZzSpinAim, cl_zz_spinaim, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim spinbot")
+MACRO_CONFIG_INT(ClZzSpinAimMode, cl_zz_spinaim_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim mode 0=spin 1=random")
+MACRO_CONFIG_INT(ClZzSpinAimSpeed, cl_zz_spinaim_speed, 50, 0, 75, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim speed")
+MACRO_CONFIG_INT(ClZzSpinAimShowMe, cl_zz_spinaim_showme, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim visible spin")
+MACRO_CONFIG_INT(ClZzSpinAimTarget, cl_zz_spinaim_target, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim target 0=main 1=dummy 2=both")
 MACRO_CONFIG_INT(InpControllerX, inp_controller_x, 0, 0, 12,
 	CFGFLAG_SAVE | CFGFLAG_CLIENT,
 	"Controller axis that controls X axis of cursor")
