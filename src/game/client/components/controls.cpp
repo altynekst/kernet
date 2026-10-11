@@ -1004,33 +1004,92 @@ int CControls::SnapInput(int *pData)
 				}
 
 				// ============================================================
-				// Fast Fire v6: лазер -> хаммер -> удар -> задержка -> лазер -> выстрел
-				// При промахе — повтор цикла. Пока не попадёт в цель.
+				// Fast Fire v7: лазер -> хаммер -> удар -> задержка -> лазер -> выстрел
+				// Повторяется пока враг в прицеле. Простая логика без проверки попадания.
 				// ============================================================
 				if(g_Config.m_ClZzFngFastFire && TriggerFound)
 				{
 					const CNetObj_Character *pFfChar = GameClient()->m_Snap.m_pLocalCharacter;
 					if(pFfChar)
 					{
-						const bool CurrentIsHammer = pFfChar->m_Weapon == WEAPON_HAMMER;
-						const bool CurrentIsLaser = pFfChar->m_Weapon == WEAPON_LASER;
-						const bool LaserReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
-						const bool HammerReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
-						const int DelayTicks = std::clamp(g_Config.m_ClZzFngFastFireDelay, 1, 30);
-						const int CheckTicks = 5;
-						const int NowTick = Client()->GameTick(FngDummyIndex);
+						const bool IsHammer = pFfChar->m_Weapon == WEAPON_HAMMER;
+						const bool IsLaser = pFfChar->m_Weapon == WEAPON_LASER;
+						const bool ReadyNow = !pLocalPredChar || pLocalPredChar->GetReloadTimer() <= 0;
+						const int Delay = std::clamp(g_Config.m_ClZzFngFastFireDelay, 1, 30);
+						const int FfStage = s_aFastFireStage[FngDummyIndex];
 
-						switch(s_aFastFireStage[FngDummyIndex])
+						// Debug log (включается через FNG debug)
+						if(g_Config.m_ClZzFngDebug)
 						{
-						case 0: // старт нового цикла
-							s_aFastFireTargetId[FngDummyIndex] = BestTriggerClientId;
-							if(BestTriggerClientId >= 0 && BestTriggerClientId < MAX_CLIENTS)
+							char aFfBuf[128];
+							str_format(aFfBuf, sizeof(aFfBuf), "FF stage=%d hammer=%d laser=%d ready=%d wait=%d",
+								FfStage, IsHammer ? 1 : 0, IsLaser ? 1 : 0, ReadyNow ? 1 : 0,
+								s_aFastFireWait[FngDummyIndex]);
+							Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "zz/ff", aFfBuf);
+						}
+
+						switch(FfStage)
+						{
+						case 0: // Начало: нужен удар хаммером
+							if(IsHammer && ReadyNow)
 							{
-								s_aFastFireWasFrozen[FngDummyIndex] =
-									GameClient()->m_aClients[BestTriggerClientId].m_FreezeEnd > NowTick ||
-									GameClient()->m_aClients[BestTriggerClientId].m_DeepFrozen ||
-									GameClient()->m_aClients[BestTriggerClientId].m_LiveFrozen;
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFastFireWait[FngDummyIndex] = Delay;
+								s_aFastFireStage[FngDummyIndex] = 1;
 							}
+							else if(!IsHammer)
+							{
+								m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_HAMMER + 1;
+							}
+							break;
+
+						case 1: // Ждём анимацию удара
+							if(s_aFastFireWait[FngDummyIndex] > 0)
+								s_aFastFireWait[FngDummyIndex]--;
+							else
+								s_aFastFireStage[FngDummyIndex] = 2;
+							break;
+
+						case 2: // Переключаемся на лазер
+							m_aInputData[FngDummyIndex].m_WantedWeapon = WEAPON_LASER + 1;
+							s_aFastFireStage[FngDummyIndex] = 3;
+							break;
+
+						case 3: // Ждём лазер + стреляем
+							if(IsLaser && ReadyNow)
+							{
+								m_aInputData[FngDummyIndex].m_TargetX = (int)round_to_int(BestTriggerDir.x * 1000.0f);
+								m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
+								if(!m_aInputData[FngDummyIndex].m_TargetX && !m_aInputData[FngDummyIndex].m_TargetY)
+									m_aInputData[FngDummyIndex].m_TargetX = 1;
+								m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
+								s_aFngLaserReleasePending[FngDummyIndex] = true;
+								s_aFngLaserInjectedFire[FngDummyIndex] = m_aInputData[FngDummyIndex].m_Fire;
+								s_aFastFireWait[FngDummyIndex] = 5;
+								s_aFastFireStage[FngDummyIndex] = 4;
+							}
+							break;
+
+						case 4: // Пауза после выстрела
+							if(s_aFastFireWait[FngDummyIndex] > 0)
+								s_aFastFireWait[FngDummyIndex]--;
+							else
+								s_aFastFireStage[FngDummyIndex] = 0;
+							break;
+
+						default:
+							s_aFastFireStage[FngDummyIndex] = 0;
+							break;
+						}
+					}
+				}
+				else
+				{
+					s_aFastFireStage[FngDummyIndex] = 0;
+					s_aFastFireWait[FngDummyIndex] = 0;
+				}
+
+
 							if(CurrentIsHammer)
 							{
 								if(HammerReadyNow)
