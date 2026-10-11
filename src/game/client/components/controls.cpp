@@ -1076,7 +1076,6 @@ int CControls::SnapInput(int *pData)
 								m_aInputData[FngDummyIndex].m_TargetY = (int)round_to_int(BestTriggerDir.y * 1000.0f);
 								if(!m_aInputData[FngDummyIndex].m_TargetX && !m_aInputData[FngDummyIndex].m_TargetY)
 									m_aInputData[FngDummyIndex].m_TargetX = 1;
-								if((m_aInputData[FngDummyIndex].m_Fire & 1) == 0)
 								{
 									m_aInputData[FngDummyIndex].m_Fire = (m_aInputData[FngDummyIndex].m_Fire + 1) & INPUT_STATE_MASK;
 									s_aFngLaserReleasePending[FngDummyIndex] = true;
