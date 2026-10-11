@@ -168,6 +168,24 @@ namespace
 		return BestDistance;
 	}
 
+	bool DmdIsNarrowSolidPassage(CCollision *pCollision, const vec2 &Point)
+	{
+		constexpr float ProbeLength = 48.0f;
+		auto SolidDistance = [&](const vec2 &Direction) {
+			vec2 HitPos;
+			if(!pCollision->IntersectLine(Point, Point + Direction * ProbeLength,
+				&HitPos, nullptr))
+				return ProbeLength;
+			return distance(Point, HitPos);
+		};
+		const float HorizontalSpan = SolidDistance(vec2(-1.0f, 0.0f)) +
+			SolidDistance(vec2(1.0f, 0.0f));
+		const float VerticalSpan = SolidDistance(vec2(0.0f, -1.0f)) +
+			SolidDistance(vec2(0.0f, 1.0f));
+		const float TightSpan = CCharacterCore::PhysicalSize() * 2.0f + 16.0f;
+		return HorizontalSpan < TightSpan || VerticalSpan < TightSpan;
+	}
+
 	bool DmdIsFreezeNearTee(CCollision *pCollision, const vec2 &Point,
 		const std::vector<SSwitchers> *pSwitchers, int Team)
 	{
@@ -9739,7 +9757,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 			if(AvoidLocalId >= 0 && AvoidAllowed)
 			{
 				bool FinalAvoidOverride = false;
-				ApplyAvoid(pInput, AvoidDummyIndex, AvoidLocalId,
+				ApplyAvoid(pInput, AvoidDummyIndex, AvoidLocalId, false,
 					FinalAvoidOverride);
 			}
 			ApplyKinetixLaserUnfreeze(pInput, AvoidDummyIndex,

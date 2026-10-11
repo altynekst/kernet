@@ -864,6 +864,15 @@ MACRO_CONFIG_INT(ClZzAvoidHookAssist, cl_zz_avoid_hook_assist, 1, 0, 1,
 MACRO_CONFIG_INT(ClZzAvoidHookAssistRange, cl_zz_avoid_hook_assist_range, 384,
 	16, 512, CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"KernelNet avoid hook assist hazard scan range (pixels)")
+MACRO_CONFIG_INT(ClZzAvoidRescueAggression, cl_zz_avoid_rescue_aggression, 50,
+        0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid: rescue hook aggression (0-100)")
+MACRO_CONFIG_INT(ClZzAvoidKogProfile, cl_zz_avoid_kog_profile, 0, 0, 1,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid: KOG profile (narrow passage tuning)")
+MACRO_CONFIG_INT(ClZzAvoidAggressiveProfile, cl_zz_avoid_aggressive_profile, 0, 0, 2,
+        CFGFLAG_CLIENT | CFGFLAG_SAVE,
+        "Avoid: aggression profile (0=off 1=aggressive 2=maximum)")
 MACRO_CONFIG_INT(ClZzAvoidDirection, cl_zz_avoid_direction, 1, 0, 1,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"Avoid: allow direction changes")
