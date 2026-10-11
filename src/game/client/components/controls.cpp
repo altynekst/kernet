@@ -1087,6 +1087,13 @@ int CControls::SnapInput(int *pData)
 				{
 					s_aFastFireStage[FngDummyIndex] = 0;
 					s_aFastFireWait[FngDummyIndex] = 0;
+				}
+
+				if(g_Config.m_ClZzFngDebug)
+				{
+					static int64_t s_LastDbg = 0;
+					const int64_t Now = time_get();
+					if(s_LastDbg == 0 || Now - s_LastDbg >= time_freq())
 					{
 						s_LastDbg = Now;
 						char aBuf[512];
