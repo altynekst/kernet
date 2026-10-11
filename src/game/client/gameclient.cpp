@@ -4158,13 +4158,21 @@ void CGameClient::UpdateFlyRide()
 }
 
 bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
-	int DummyIndex, int LocalId, bool &OverrodeInput)
+	int DummyIndex, int LocalId, bool AimOwnedByAction, bool &OverrodeInput)
 {
 	OverrodeInput = false;
 	// Avoid caches the previous prediction so repeated SnapInput calls for one
 	// tick stay cheap. Clear that cache while disabled: otherwise toggling Avoid
 	// back on (or switching a dummy/local tee) could replay an old movement or
 	// hook decision for one packet.
+	static int s_aJumpInjectedTick[NUM_DUMMIES] = {-1, -1, -1};
+	static bool s_aJumpAwaitingRelease[NUM_DUMMIES] = {};
+	static CNetObj_PlayerInput s_aAnalyzedInput[NUM_DUMMIES] = {};
+	static bool s_aAnalyzedAimOwned[NUM_DUMMIES] = {};
+	static int s_aAnalyzedAggressiveProfile[NUM_DUMMIES] = {};
+	static int s_aAnalyzedHookState[NUM_DUMMIES] = {};
+	static CNetObj_CharacterCore s_aAnalyzedCore[NUM_DUMMIES] = {};
+	static int s_aAnalyzedWorldTick[NUM_DUMMIES] = {};
 	static bool s_aWasEnabled[NUM_DUMMIES] = {};
 	static int s_aLastLocalId[NUM_DUMMIES] = {-1, -1, -1};
 	static bool s_aWasOverriding[NUM_DUMMIES] = {};
@@ -4172,16 +4180,31 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 	static int s_aAnalyzedTick[NUM_DUMMIES] = {-1, -1, -1};
 	static bool s_aCachedOverride[NUM_DUMMIES] = {};
 	static CNetObj_PlayerInput s_aCachedInput[NUM_DUMMIES] = {};
+	static bool s_aRescueHookActive[NUM_DUMMIES] = {};
+	static int s_aRescueHookTargetX[NUM_DUMMIES] = {};
+	static int s_aRescueHookTargetY[NUM_DUMMIES] = {};
+	static int s_aRescueDirection[NUM_DUMMIES] = {};
+	static int s_aRescueHookStartTick[NUM_DUMMIES] = {};
+	static int s_aRescueHookReleaseTick[NUM_DUMMIES] = {};
+	static int s_aRescueSafeTicks[NUM_DUMMIES] = {};
+	static int s_aRescueSafeCheckTick[NUM_DUMMIES] = {-1, -1, -1};
+	static bool s_aRescuePreferDownNext[NUM_DUMMIES] = {};
 	if(!g_Config.m_ClZzAvoidEnabled)
 	{
 		for(int Index = 0; Index < NUM_DUMMIES; ++Index)
 		{
+			s_aJumpInjectedTick[Index] = -1;
+			s_aJumpAwaitingRelease[Index] = false;
 			s_aWasEnabled[Index] = false;
 			s_aWasOverriding[Index] = false;
 			s_aOverrideHook[Index] = 0;
 			s_aAnalyzedTick[Index] = -1;
 			s_aCachedOverride[Index] = false;
 			s_aLastLocalId[Index] = -1;
+			s_aRescueHookActive[Index] = false;
+			s_aRescueSafeTicks[Index] = 0;
+			s_aRescueSafeCheckTick[Index] = -1;
+			s_aRescuePreferDownNext[Index] = false;
 		}
 		return false;
 	}
@@ -4190,19 +4213,42 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 	if(!pInput || DummyIndex < 0 || DummyIndex >= NUM_DUMMIES ||
 		LocalId < 0 || LocalId >= MAX_CLIENTS)
 		return true;
-
 	const int NowTick = Client()->PredGameTick(DummyIndex);
 	if(!s_aWasEnabled[DummyIndex] || s_aLastLocalId[DummyIndex] != LocalId ||
 		NowTick < s_aAnalyzedTick[DummyIndex])
 	{
+		s_aJumpInjectedTick[DummyIndex] = -1;
+		s_aJumpAwaitingRelease[DummyIndex] = false;
 		s_aWasOverriding[DummyIndex] = false;
 		s_aOverrideHook[DummyIndex] = 0;
 		s_aAnalyzedTick[DummyIndex] = -1;
 		s_aCachedOverride[DummyIndex] = false;
+		s_aRescueHookActive[DummyIndex] = false;
+		s_aRescueSafeTicks[DummyIndex] = 0;
+		s_aRescueSafeCheckTick[DummyIndex] = -1;
+		s_aRescuePreferDownNext[DummyIndex] = false;
 	}
 	s_aWasEnabled[DummyIndex] = true;
 	s_aLastLocalId[DummyIndex] = LocalId;
-	if(s_aAnalyzedTick[DummyIndex] == NowTick)
+	CCharacter *pAvoidChar = m_PredictedWorld.GetCharacterById(LocalId);
+	if(!pAvoidChar)
+		return true;
+	const int AvoidProfile = std::clamp(g_Config.m_ClZzAvoidAggressiveProfile, 0, 2);
+	const bool AggressiveProfile = AvoidProfile > 0;
+	const bool MaximumProfile = AvoidProfile == 2;
+	const bool KogProfile = g_Config.m_ClZzAvoidKogProfile && !AggressiveProfile;
+	// An action can arrive between two packets of the same tick. Never replay
+	// a cached hook target over a new shot/helper target (or a changed jump).
+	AimOwnedByAction |= (pInput->m_Fire & 1) != 0;
+	CNetObj_CharacterCore AnalyzedCore{};
+	pAvoidChar->Core()->Write(&AnalyzedCore);
+	if(s_aAnalyzedTick[DummyIndex] == NowTick &&
+		s_aAnalyzedWorldTick[DummyIndex] == m_PredictedWorld.GameTick() &&
+		mem_comp(&s_aAnalyzedCore[DummyIndex], &AnalyzedCore, sizeof(AnalyzedCore)) == 0 &&
+		s_aAnalyzedAimOwned[DummyIndex] == AimOwnedByAction &&
+		s_aAnalyzedAggressiveProfile[DummyIndex] == AvoidProfile &&
+		s_aAnalyzedHookState[DummyIndex] == pAvoidChar->Core()->m_HookState &&
+		mem_comp(&s_aAnalyzedInput[DummyIndex], pInput, sizeof(*pInput)) == 0)
 	{
 		if(s_aCachedOverride[DummyIndex])
 		{
@@ -4213,7 +4259,7 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 			pInput->m_TargetX = Cached.m_TargetX;
 			pInput->m_TargetY = Cached.m_TargetY;
 			m_Controls.m_aInputData[DummyIndex].m_Direction = Cached.m_Direction;
-			m_Controls.m_aInputData[DummyIndex].m_Jump = Cached.m_Jump;
+			m_Controls.m_aLastData[DummyIndex].m_Jump = Cached.m_Jump;
 			m_Controls.m_aInputData[DummyIndex].m_Hook = Cached.m_Hook;
 			m_Controls.m_aInputData[DummyIndex].m_TargetX = Cached.m_TargetX;
 			m_Controls.m_aInputData[DummyIndex].m_TargetY = Cached.m_TargetY;
@@ -4221,22 +4267,77 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 		}
 		return true;
 	}
+	s_aAnalyzedInput[DummyIndex] = *pInput;
+	s_aAnalyzedCore[DummyIndex] = AnalyzedCore;
+	s_aAnalyzedWorldTick[DummyIndex] = m_PredictedWorld.GameTick();
+	s_aAnalyzedAimOwned[DummyIndex] = AimOwnedByAction;
+	s_aAnalyzedAggressiveProfile[DummyIndex] = AvoidProfile;
+	s_aAnalyzedHookState[DummyIndex] = pAvoidChar->Core()->m_HookState;
 	s_aAnalyzedTick[DummyIndex] = NowTick;
 	s_aCachedOverride[DummyIndex] = false;
 	auto CacheOverride = [&]() {
+		// Keep the key/button state untouched. LastData forces the following
+		// release packet even when Avoid is disabled immediately after injection.
+		m_Controls.m_aLastData[DummyIndex].m_Jump = pInput->m_Jump;
 		s_aCachedInput[DummyIndex] = *pInput;
 		s_aCachedOverride[DummyIndex] = OverrodeInput;
 	};
-	CCharacter *pAvoidChar = m_PredictedWorld.GetCharacterById(LocalId);
-	if(!pAvoidChar)
-		return true;
+	// Re-arm only after a distinct release tick and a released predicted core.
+	// A newly held user jump is never forcibly released to create another edge.
+	if(s_aJumpAwaitingRelease[DummyIndex] &&
+		NowTick > s_aJumpInjectedTick[DummyIndex] + 1 &&
+		!(pAvoidChar->Core()->m_Jumped & 1))
+		s_aJumpAwaitingRelease[DummyIndex] = false;
+	if(s_aJumpInjectedTick[DummyIndex] == NowTick && !pInput->m_Jump)
+	{
+		pInput->m_Jump = 1;
+		OverrodeInput = true;
+		CacheOverride();
+	}
+	const bool ContinuingJumpPulse = s_aJumpInjectedTick[DummyIndex] == NowTick &&
+		s_aAnalyzedInput[DummyIndex].m_Jump == 0;
 	const int AvoidTeam = pAvoidChar->Team();
 	const std::vector<SSwitchers> *pAvoidSwitchers =
 		&m_PredictedWorld.Switchers();
+	// Clearance ranks already necessary rescues; proximity alone must not turn
+	// a safe user trajectory into a hazard. Require actual predicted contact.
+	constexpr float AvoidFreezeMargin = 0.0f;
+	auto IsVerticalFreezeCorridorAt = [&](const vec2 &Pos,
+		const std::vector<SSwitchers> *pSwitchers, int Team) {
+		const bool Above =
+			DmdIsFreezeNearTee(Collision(), Pos + vec2(0.0f, -24.0f),
+				pSwitchers, Team) ||
+			DmdIsFreezeNearTee(Collision(), Pos + vec2(0.0f, -40.0f),
+				pSwitchers, Team);
+		const bool Below =
+			DmdIsFreezeNearTee(Collision(), Pos + vec2(0.0f, 24.0f),
+				pSwitchers, Team) ||
+			DmdIsFreezeNearTee(Collision(), Pos + vec2(0.0f, 40.0f),
+				pSwitchers, Team);
+		return Above && Below;
+	};
 
+	struct SHookTrajectory
+	{
+		int m_AttachTick = -1;
+		int m_ReleaseTick = -1;
+		int m_PostReleaseTicks = 0;
+		float m_ControlCost = 0.0f;
+	};
 	auto SimulateDangerExact = [&](const CNetObj_PlayerInput &DelayInput,
 		int Delay, const CNetObj_PlayerInput &ComboInput, int Ticks,
-		bool AllowBraking) {
+		bool AllowBraking, bool *pJumped = nullptr,
+		float *pMinimumClearance = nullptr, float *pEndClearance = nullptr,
+		int AttachedHoldTicks = -1, SHookTrajectory *pTrajectory = nullptr) {
+		SHookTrajectory Trajectory;
+		if(pTrajectory)
+			*pTrajectory = Trajectory;
+		if(pJumped)
+			*pJumped = false;
+		if(pMinimumClearance)
+			*pMinimumClearance = 0.0f;
+		if(pEndClearance)
+			*pEndClearance = 0.0f;
 		CGameWorld SimWorld;
 		// Kinetix runs the search from the current predicted world. Using the
 		// regular-prediction copy here made the result lag behind the input that
@@ -4247,42 +4348,92 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 		SimWorld.m_WorldConfig.m_PredictDDRace = true;
 		SimWorld.m_WorldConfig.m_PredictTiles = true;
 		SimWorld.m_WorldConfig.m_PredictFreeze = 1;
-		for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
-		{
-			if(ClientId == LocalId)
-				continue;
-			if(CCharacter *pOther = SimWorld.GetCharacterById(ClientId))
-				delete pOther;
-		}
+		// Preserve predicted tee collisions and existing player hooks. Removing
+		// their endpoints would make a safe user hook look like an unsafe fall.
 		CCharacter *pChar = SimWorld.GetCharacterById(LocalId);
 		if(!pChar)
 			return 0;
 		const int StartTick = SimWorld.GameTick();
 		vec2 PreviousPos = pChar->Core()->m_Pos;
+		vec2 PreviousVelocity = pChar->Core()->m_Vel;
+		const vec2 InitialPos = PreviousPos;
+		const float InitialSpeed = length(PreviousVelocity);
+		const vec2 TravelAxis = InitialSpeed > 0.5f ? normalize(PreviousVelocity) : vec2(0.0f, 1.0f);
 		float PreviousFreezeClearance = DmdFreezeClearance(Collision(),
 			PreviousPos, &SimWorld.Switchers(), pChar->Team());
 		float MinimumFreezeClearance = PreviousFreezeClearance;
+		auto StoreClearance = [&](float EndClearance) {
+			if(pMinimumClearance)
+				*pMinimumClearance = MinimumFreezeClearance;
+			if(pEndClearance)
+				*pEndClearance = EndClearance;
+		};
 		int FirstMarginTick = 0;
 		for(int Tick = 0; Tick < Ticks; ++Tick)
 		{
-			const CNetObj_PlayerInput &Input =
-				Tick < Delay ? DelayInput : ComboInput;
+			CNetObj_PlayerInput Input = Tick < Delay ? DelayInput : ComboInput;
+			if(AttachedHoldTicks >= 0)
+				Input = DelayInput;
+			if(AttachedHoldTicks >= 0 && Trajectory.m_AttachTick >= 0 &&
+				Tick >= Trajectory.m_AttachTick + AttachedHoldTicks)
+			{
+				Input = ComboInput;
+				Input.m_Hook = 0;
+				if(Trajectory.m_ReleaseTick < 0)
+					Trajectory.m_ReleaseTick = Tick;
+				++Trajectory.m_PostReleaseTicks;
+			}
+			if(ContinuingJumpPulse && Tick > 0)
+				Input.m_Jump = 0;
 			pChar->OnDirectInput(&Input);
 			SimWorld.m_GameTick = StartTick + Tick + 1;
 			pChar->OnPredictedInput(&Input);
 			SimWorld.Tick();
 			pChar = SimWorld.GetCharacterById(LocalId);
 			if(!pChar)
+			{
+				StoreClearance(PreviousFreezeClearance);
 				return g_Config.m_ClZzAvoidKill ? Tick + 1 : 0;
+			}
+			if(pJumped && Tick == 0)
+				*pJumped = (pChar->Core()->m_TriggeredEvents & (COREEVENT_GROUND_JUMP | COREEVENT_AIR_JUMP)) != 0;
 			const vec2 CurrentPos = pChar->Core()->m_Pos;
 			const float CurrentFreezeClearance = DmdFreezeClearance(Collision(),
 				CurrentPos, &SimWorld.Switchers(), pChar->Team());
+			if(pTrajectory)
+			{
+				if(Trajectory.m_AttachTick < 0 && pChar->Core()->m_HookState == HOOK_GRABBED)
+					Trajectory.m_AttachTick = Tick + 1;
+				if(Trajectory.m_AttachTick >= 0)
+				{
+					const vec2 Velocity = pChar->Core()->m_Vel;
+					const vec2 Offset = CurrentPos - InitialPos;
+					const float LateralTravel = fabsf(Offset.x * TravelAxis.y - Offset.y * TravelAxis.x);
+					const bool Tight = DmdIsNarrowSolidPassage(Collision(), CurrentPos);
+					const float ExtraSpeed = maximum(0.0f, length(Velocity) - InitialSpeed);
+					const bool Reversal = dot(Velocity, PreviousVelocity) < -1.0f;
+					const bool WallContact = Collision()->CheckPoint(CurrentPos + vec2(16, 0)) ||
+						Collision()->CheckPoint(CurrentPos + vec2(-16, 0)) ||
+						Collision()->CheckPoint(CurrentPos + vec2(0, -16));
+					Trajectory.m_ControlCost += ExtraSpeed * (Tight ? 0.7f : 0.15f) +
+						LateralTravel * (Tight ? 0.025f : 0.003f) + (Reversal ? 3.0f : 0.0f) +
+						(WallContact ? length(Velocity - PreviousVelocity) * 0.5f : 0.0f);
+					PreviousVelocity = Velocity;
+				}
+				*pTrajectory = Trajectory;
+			}
 			// Keep a full tile of clearance. If we are already inside that margin,
 			// only motion farther into it is rejected, so Avoid never traps the tee
 			// and still permits walking/jumping away from freeze.
+			// Trigger the comfort margin only when crossing it from the outside.
+			// While already inside a narrow one-tile corridor, tiny vertical physics
+			// fluctuations must not be mistaken for walking into the surrounding
+			// freeze; actual swept contact is still checked below every tick.
 			const bool ApproachesFreezeMargin =
-				CurrentFreezeClearance <= 32.0f &&
-				CurrentFreezeClearance + 0.05f < PreviousFreezeClearance;
+				!IsVerticalFreezeCorridorAt(CurrentPos, &SimWorld.Switchers(),
+					pChar->Team()) &&
+				PreviousFreezeClearance > AvoidFreezeMargin &&
+				CurrentFreezeClearance <= AvoidFreezeMargin;
 			if(ApproachesFreezeMargin && FirstMarginTick == 0)
 				FirstMarginTick = Tick + 1;
 			MinimumFreezeClearance = minimum(MinimumFreezeClearance,
@@ -4292,8 +4443,11 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 					pChar->Core()->m_DeepFrozen || pChar->Core()->m_LiveFrozen ||
 					(ApproachesFreezeMargin && !AllowBraking) ||
 					DmdSegmentTouchesFreeze(Collision(), PreviousPos, CurrentPos,
-						&SimWorld.Switchers(), pChar->Team())))
+						&SimWorld.Switchers(), pChar->Team(), AggressiveProfile)))
+			{
+				StoreClearance(CurrentFreezeClearance);
 				return Tick + 1;
+			}
 			// Sample the complete swept segment. Checking only the final center
 			// point skipped death/tele tiles at high horizontal or vertical speed.
 			const int SegmentSteps = std::clamp(
@@ -4308,26 +4462,38 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 				if(g_Config.m_ClZzAvoidKill &&
 					(Collision()->GetTileIndex(MapIndex) == TILE_DEATH ||
 						Collision()->GetFrontTileIndex(MapIndex) == TILE_DEATH))
+				{
+					StoreClearance(CurrentFreezeClearance);
 					return Tick + 1;
+				}
 				if(g_Config.m_ClZzAvoidTele &&
 					(Collision()->IsTeleport(MapIndex) ||
 						Collision()->IsEvilTeleport(MapIndex) ||
 						Collision()->IsTeleportHook(MapIndex)))
+				{
+					StoreClearance(CurrentFreezeClearance);
 					return Tick + 1;
+				}
 			}
 			PreviousPos = CurrentPos;
 			PreviousFreezeClearance = CurrentFreezeClearance;
 		}
 		if(g_Config.m_ClZzAvoidFreeze && AllowBraking && FirstMarginTick > 0 &&
-			PreviousFreezeClearance < 32.0f &&
+			PreviousFreezeClearance < AvoidFreezeMargin &&
 			PreviousFreezeClearance <= MinimumFreezeClearance + 0.25f)
+		{
+			StoreClearance(PreviousFreezeClearance);
 			return FirstMarginTick;
+		}
+		StoreClearance(PreviousFreezeClearance);
 		return 0;
 	};
 
 	auto SimulateDangerFast = [&](const CNetObj_PlayerInput &DelayInput,
 		int Delay, const CNetObj_PlayerInput &ComboInput, int Ticks,
-		bool AllowBraking) {
+		bool AllowBraking, bool *pJumped = nullptr) {
+		if(pJumped)
+			*pJumped = false;
 		CDmdFastCoreWorld FastWorld(m_PredictedWorld, Collision(), LocalId);
 		CCharacterCore *pCore = FastWorld.LocalCore();
 		if(!pCore)
@@ -4339,16 +4505,22 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 		int FirstMarginTick = 0;
 		for(int Tick = 0; Tick < Ticks; ++Tick)
 		{
-			FastWorld.Step(Tick < Delay ? DelayInput : ComboInput);
+			CNetObj_PlayerInput Input = Tick < Delay ? DelayInput : ComboInput;
+			if(ContinuingJumpPulse && Tick > 0)
+				Input.m_Jump = 0;
+			FastWorld.Step(Input);
 			pCore = FastWorld.LocalCore();
 			if(!pCore)
 				return g_Config.m_ClZzAvoidKill ? Tick + 1 : 0;
+			if(pJumped && Tick == 0)
+				*pJumped = (pCore->m_TriggeredEvents & (COREEVENT_GROUND_JUMP | COREEVENT_AIR_JUMP)) != 0;
 			const vec2 CurrentPos = pCore->m_Pos;
 			const float CurrentFreezeClearance = DmdFreezeClearance(Collision(),
 				CurrentPos, pAvoidSwitchers, AvoidTeam);
 			const bool ApproachesFreezeMargin =
-				CurrentFreezeClearance <= 32.0f &&
-				CurrentFreezeClearance + 0.05f < PreviousFreezeClearance;
+				!IsVerticalFreezeCorridorAt(CurrentPos, pAvoidSwitchers, AvoidTeam) &&
+				PreviousFreezeClearance > AvoidFreezeMargin &&
+				CurrentFreezeClearance <= AvoidFreezeMargin;
 			if(ApproachesFreezeMargin && FirstMarginTick == 0)
 				FirstMarginTick = Tick + 1;
 			MinimumFreezeClearance = minimum(MinimumFreezeClearance,
@@ -4356,7 +4528,7 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 			if(g_Config.m_ClZzAvoidFreeze &&
 				((ApproachesFreezeMargin && !AllowBraking) ||
 					DmdSegmentTouchesFreeze(Collision(), PreviousPos, CurrentPos,
-						pAvoidSwitchers, AvoidTeam)))
+						pAvoidSwitchers, AvoidTeam, AggressiveProfile)))
 				return Tick + 1;
 			const int SegmentSteps = std::clamp(
 				(int)ceilf(distance(PreviousPos, CurrentPos) / 8.0f), 1, 32);
@@ -4381,7 +4553,7 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 			PreviousFreezeClearance = CurrentFreezeClearance;
 		}
 		if(g_Config.m_ClZzAvoidFreeze && AllowBraking && FirstMarginTick > 0 &&
-			PreviousFreezeClearance < 32.0f &&
+			PreviousFreezeClearance < AvoidFreezeMargin &&
 			PreviousFreezeClearance <= MinimumFreezeClearance + 0.25f)
 			return FirstMarginTick;
 		return 0;
@@ -4397,17 +4569,186 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 		return Diff;
 	};
 
-	const CNetObj_PlayerInput Current = *pInput;
-	const int SimTicks = std::clamp(g_Config.m_ClZzAvoidTicks, 1, 20);
-	// Kinetix checks the complete configured prediction horizon. Restricting
-	// this initial check to the trigger window made Avoid wake up only two or
-	// three ticks before impact, when walking/jumping could no longer change the
-	// outcome. Keep the trigger value as an optional extension, never as a
-	// shorter replacement for the real simulation horizon.
-	const int DetectionTicks = maximum(SimTicks,
-		std::clamp(g_Config.m_ClZzAvoidTriggerTicks, 1, 20));
-	CNetObj_PlayerInput NoHook = Current;
-	NoHook.m_Hook = 0;
+	CNetObj_PlayerInput Current = *pInput;
+	const int ReactionTicks = std::clamp(g_Config.m_ClZzAvoidTicks, 1, 20);
+	const float RescueAggression = std::clamp(
+		g_Config.m_ClZzAvoidRescueAggression, 0, 100) / 100.0f;
+	const bool KogNarrowPassage = KogProfile &&
+		DmdIsNarrowSolidPassage(Collision(), pAvoidChar->Core()->m_Pos);
+	const bool CurrentDirectionApproachesFreeze = Current.m_Direction != 0 &&
+		DmdIsFreezeNearTee(Collision(), pAvoidChar->Core()->m_Pos +
+			vec2((float)Current.m_Direction * 24.0f, 0.0f),
+			pAvoidSwitchers, AvoidTeam);
+	// Require nearby, confirmed danger. Aggression affects rescue ranking, not
+	// permission to take over a still-safe trajectory far ahead of the player.
+	const float CurrentSpeed = length(pAvoidChar->Core()->m_Vel);
+	const int MovementReactionTicks = AggressiveProfile ?
+		maximum(ReactionTicks, std::clamp((int)ceilf(CurrentSpeed *
+			(MaximumProfile ? 2.5f : 1.5f) + (MaximumProfile ? 6.0f : 0.0f)),
+			MaximumProfile ? 14 : 8, 20)) :
+		std::clamp(ReactionTicks, 4, KogProfile ? 8 : 12);
+	// A rescue needs time to reach the wall before it can change velocity.
+	// This only extends evaluation for a baseline that actually hits danger.
+	const int RescueReactionTicks = g_Config.m_ClZzAvoidHookAssist && !AimOwnedByAction ?
+		maximum(MovementReactionTicks, std::clamp((int)ceilf(
+			minimum((float)m_aTuning[DummyIndex].m_HookLength,
+				(float)g_Config.m_ClZzAvoidHookAssistRange) /
+			maximum(1.0f, (float)m_aTuning[DummyIndex].m_HookFireSpeed)) + 2, 4, 12)) :
+		MovementReactionTicks;
+	// Scan beyond the bounded reaction window to validate the whole rescue.
+	const int DetectionTicks = maximum(MaximumProfile ? 48 : AggressiveProfile ? 40 : 24,
+		ReactionTicks + 12);
+	if(!g_Config.m_ClZzAvoidHookAssist && s_aRescueHookActive[DummyIndex])
+	{
+		// The toggle controls both future scans and a hook that Avoid itself is
+		// currently holding. Release only that automatic state; movement and jump
+		// candidates still run below.
+		s_aRescueHookActive[DummyIndex] = false;
+		s_aRescueSafeTicks[DummyIndex] = 0;
+		s_aWasOverriding[DummyIndex] = true;
+		s_aOverrideHook[DummyIndex] = 0;
+		Current.m_Hook = pInput->m_Hook = 0;
+		m_Controls.m_aInputData[DummyIndex].m_Hook = 0;
+		OverrodeInput = true;
+	}
+	if(s_aRescueHookActive[DummyIndex] && AimOwnedByAction &&
+		pAvoidChar->Core()->m_HookState != HOOK_FLYING &&
+		pAvoidChar->Core()->m_HookState != HOOK_GRABBED)
+	{
+		// Release a pending/failed automatic launch, then still evaluate movement
+		// and jump with the action's target. Never launch along the shot target.
+		s_aRescueHookActive[DummyIndex] = false;
+		s_aRescueSafeTicks[DummyIndex] = 0;
+		s_aWasOverriding[DummyIndex] = true;
+		s_aOverrideHook[DummyIndex] = 0;
+		Current.m_Hook = pInput->m_Hook = 0;
+		m_Controls.m_aInputData[DummyIndex].m_Hook = 0;
+		OverrodeInput = true;
+		CacheOverride();
+	}
+	if(s_aRescueHookActive[DummyIndex])
+	{
+		const int HeldTicks = maximum(0,
+			NowTick - s_aRescueHookStartTick[DummyIndex]);
+		const int HookState = pAvoidChar->Core()->m_HookState;
+		const bool HookFailed = HookState == HOOK_RETRACTED ||
+			(HookState >= HOOK_RETRACT_START && HookState <= HOOK_RETRACT_END);
+		CNetObj_PlayerInput ReleaseInput = Current;
+		ReleaseInput.m_Hook = 0;
+		const int ReleaseCheckTicks = maximum(DetectionTicks,
+			maximum(1, s_aRescueHookReleaseTick[DummyIndex] - NowTick) + 8);
+		const int ReleaseDanger = SimulateDangerExact(ReleaseInput, 0,
+			ReleaseInput, ReleaseCheckTicks, false);
+		// Safe free fall is still safe: do not keep pulling toward a wall or the
+		// ground merely to obtain a grounded/slower state.
+		const bool SafeWithoutHook = ReleaseDanger == 0;
+		if(s_aRescueSafeCheckTick[DummyIndex] != NowTick)
+		{
+			s_aRescueSafeTicks[DummyIndex] = SafeWithoutHook ?
+				s_aRescueSafeTicks[DummyIndex] + 1 : 0;
+			s_aRescueSafeCheckTick[DummyIndex] = NowTick;
+		}
+		else if(!SafeWithoutHook)
+			s_aRescueSafeTicks[DummyIndex] = 0;
+		const bool UpperHookPhase =
+			s_aRescueHookTargetY[DummyIndex] < -180;
+		// Execute the release that was validated together with the pull trajectory.
+		// Releasing an upper hook merely because free fall is unsafe discards the
+		// very correction that prediction selected.
+		const bool PlannedRelease = NowTick >= s_aRescueHookReleaseTick[DummyIndex];
+
+		// A freshly fired hook is still reported as retracted/idle by the last
+		// predicted snapshot for a few ticks. Releasing immediately here reduced
+		// every rescue to a one-packet pulse which often never reached the server.
+		// Keep the button held for a complete hook flight before treating a
+		// retraction as a failed attempt.
+		const int HookFlightTicks = std::clamp(
+			(int)ceilf((float)m_aTuning[DummyIndex].m_HookLength /
+				maximum(1.0f, (float)m_aTuning[DummyIndex].m_HookFireSpeed)) + 2,
+			6, 12);
+		if(PlannedRelease || (HookFailed && HeldTicks >= HookFlightTicks) ||
+			(HeldTicks > 0 && SafeWithoutHook))
+		{
+			// Send the planned release edge, or release a failed/safely finished
+			// rescue early. Do not restart a hook in this same packet.
+			pInput->m_Hook = 0;
+			m_Controls.m_aInputData[DummyIndex].m_Hook = 0;
+			s_aRescueHookActive[DummyIndex] = false;
+			s_aRescueSafeTicks[DummyIndex] = 0;
+			if(HookFailed && HeldTicks >= HookFlightTicks && UpperHookPhase)
+				s_aRescuePreferDownNext[DummyIndex] = true;
+			else if(SafeWithoutHook)
+				s_aRescuePreferDownNext[DummyIndex] = false;
+			s_aWasOverriding[DummyIndex] = true;
+			s_aOverrideHook[DummyIndex] = 0;
+			OverrodeInput = true;
+			CacheOverride();
+			return true;
+		}
+
+		CNetObj_PlayerInput UserDirectionHook = Current;
+		UserDirectionHook.m_Hook = 1;
+		if(!AimOwnedByAction)
+		{
+			UserDirectionHook.m_TargetX = s_aRescueHookTargetX[DummyIndex];
+			UserDirectionHook.m_TargetY = s_aRescueHookTargetY[DummyIndex];
+		}
+		const int RemainingHold = maximum(1, s_aRescueHookReleaseTick[DummyIndex] - NowTick);
+		const int RecheckTicks = maximum(DetectionTicks, RemainingHold + 8);
+		const int UserDirectionDanger = SimulateDangerExact(UserDirectionHook,
+			RemainingHold, ReleaseInput, RecheckTicks, false);
+		const auto Survival = [&](int Danger) { return Danger > 0 ? Danger - 1 : RecheckTicks; };
+		int BestContinuation = Survival(UserDirectionDanger);
+		pInput->m_Direction = Current.m_Direction;
+		if(g_Config.m_ClZzAvoidDirection && UserDirectionDanger > 0 &&
+			UserDirectionDanger <= MovementReactionTicks &&
+			s_aRescueDirection[DummyIndex] != Current.m_Direction)
+		{
+			CNetObj_PlayerInput SavedDirectionHook = UserDirectionHook;
+			SavedDirectionHook.m_Direction = s_aRescueDirection[DummyIndex];
+			const int SavedSurvival = Survival(SimulateDangerExact(SavedDirectionHook,
+				RemainingHold, ReleaseInput, RecheckTicks, false));
+			if(SavedSurvival > BestContinuation)
+			{
+				BestContinuation = SavedSurvival;
+				pInput->m_Direction = SavedDirectionHook.m_Direction;
+			}
+		}
+		// Re-evaluate after movement/attachment changed. A previously useful pull
+		// must not keep dragging the tee into a corridor edge when release is safer.
+		if(BestContinuation < MovementReactionTicks &&
+			SimulateDangerExact(ReleaseInput, 0, ReleaseInput, RecheckTicks, false) == 0)
+		{
+			pInput->m_Direction = Current.m_Direction;
+			pInput->m_Hook = 0;
+			m_Controls.m_aInputData[DummyIndex].m_Hook = 0;
+			s_aRescueHookActive[DummyIndex] = false;
+			s_aRescueSafeTicks[DummyIndex] = 0;
+			s_aWasOverriding[DummyIndex] = true;
+			s_aOverrideHook[DummyIndex] = 0;
+			OverrodeInput = true;
+			CacheOverride();
+			return true;
+		}
+		pInput->m_Jump = Current.m_Jump;
+		pInput->m_Hook = 1;
+		if(!AimOwnedByAction)
+		{
+			pInput->m_TargetX = s_aRescueHookTargetX[DummyIndex];
+			pInput->m_TargetY = s_aRescueHookTargetY[DummyIndex];
+		}
+		m_Controls.m_aInputData[DummyIndex].m_Direction = pInput->m_Direction;
+		m_Controls.m_aInputData[DummyIndex].m_Hook = 1;
+		m_Controls.m_aInputData[DummyIndex].m_TargetX = pInput->m_TargetX;
+		m_Controls.m_aInputData[DummyIndex].m_TargetY = pInput->m_TargetY;
+		// Do not mirror this into m_aFastInput. CheckNewInput compares against
+		// that previous state to detect the 0->1 hook edge and send it instantly.
+		s_aWasOverriding[DummyIndex] = true;
+		s_aOverrideHook[DummyIndex] = 1;
+		OverrodeInput = true;
+		CacheOverride();
+		return true;
+	}
 	auto FinishSafe = [&]() {
 		if(s_aWasOverriding[DummyIndex])
 		{
@@ -4415,22 +4756,15 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 			{
 				pInput->m_Hook = 0;
 				m_Controls.m_aInputData[DummyIndex].m_Hook = 0;
-				m_Controls.m_aFastInput[DummyIndex].m_Hook = 0;
 				OverrodeInput = true;
 				CacheOverride();
 			}
 			s_aWasOverriding[DummyIndex] = false;
 		}
 	};
-	// The broad gate is core-only and allocation-free. In normal gameplay, far
-	// from danger, Avoid now returns here without cloning a CGameWorld at all.
-	const int FastDangerCurrent =
-		SimulateDangerFast(Current, 0, Current, DetectionTicks, false);
-	if(FastDangerCurrent == 0)
-	{
-		FinishSafe();
-		return true;
-	}
+	// Core-only simulation cannot certify safety: it omits speedups, extended
+	// freeze tiles and world entities. Validate the baseline in the same world
+	// as the rescue; fast simulation is only a shortlist heuristic.
 	const int DangerCurrent =
 		SimulateDangerExact(Current, 0, Current, DetectionTicks, false);
 	if(DangerCurrent == 0)
@@ -4438,181 +4772,471 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 		FinishSafe();
 		return true;
 	}
-	const int DangerNoHook = Current.m_Hook == 0 ? DangerCurrent :
-		SimulateDangerExact(NoHook, 0, NoHook, DetectionTicks, false);
-
-	// Release a dangerous hook immediately. Re-testing "one more safe tick"
-	// every frame caused a receding-horizon bug: the decision was postponed
-	// forever until the tee had already entered freeze.
-	if(DangerCurrent > 0 && DangerNoHook == 0)
+	if(DangerCurrent > RescueReactionTicks)
 	{
-		pInput->m_Hook = 0;
-		m_Controls.m_aInputData[DummyIndex].m_Hook = 0;
-		m_Controls.m_aFastInput[DummyIndex].m_Hook = 0;
-		s_aWasOverriding[DummyIndex] = true;
-		s_aOverrideHook[DummyIndex] = 0;
-		OverrodeInput = true;
-		CacheOverride();
+		FinishSafe();
 		return true;
 	}
-
-	std::vector<CNetObj_PlayerInput> vCandidates;
-	vCandidates.reserve(g_Config.m_ClZzAvoidAim ? 160 : 12);
-	auto AddCandidate = [&](const CNetObj_PlayerInput &Candidate) {
-		for(const CNetObj_PlayerInput &Existing : vCandidates)
-		{
-			if(Existing.m_Direction == Candidate.m_Direction &&
-				(Existing.m_Jump != 0) == (Candidate.m_Jump != 0) &&
-				(Existing.m_Hook != 0) == (Candidate.m_Hook != 0) &&
-				Existing.m_TargetX == Candidate.m_TargetX &&
-				Existing.m_TargetY == Candidate.m_TargetY)
-				return;
-		}
-		vCandidates.push_back(Candidate);
-	};
-	const int aDirections[] = {-1, 0, 1};
-	const int DirectionVariants = g_Config.m_ClZzAvoidDirection ? 3 : 1;
-	const int JumpVariants = g_Config.m_ClZzAvoidJump ? 2 : 1;
-	const int HookVariants = g_Config.m_ClZzAvoidHookAssist ? 2 : 1;
-	const float CurrentAimAngle = atan2f((float)Current.m_TargetY,
-		(float)Current.m_TargetX);
-	const float AimDistance = maximum(1.0f,
-		sqrtf((float)Current.m_TargetX * Current.m_TargetX +
-			(float)Current.m_TargetY * Current.m_TargetY));
-	// A 144-angle Cartesian search used to tick thousands of candidates per
-	// frame. Sixteen evenly spaced directions keep hook-assist coverage while
-	// bounding the lightweight pass even with direction and jump enabled.
-	const int ConfiguredAimVariants = g_Config.m_ClZzAvoidAim ?
-		std::clamp(g_Config.m_ClZzAvoidAngles, 1, 16) : 1;
-	const float AimFov = (float)std::clamp(g_Config.m_ClZzAvoidFov, 5, 360) *
-		(pi / 180.0f);
-	for(int DirectionIndex = 0; DirectionIndex < DirectionVariants;
-		DirectionIndex++)
-	{
-		const int DirectionValue = g_Config.m_ClZzAvoidDirection ?
-			aDirections[DirectionIndex] : Current.m_Direction;
-		for(int JumpVariant = 0; JumpVariant < JumpVariants; ++JumpVariant)
-		{
-			for(int HookVariant = 0; HookVariant < HookVariants; ++HookVariant)
-			{
-				const int Hook = g_Config.m_ClZzAvoidHookAssist ? HookVariant :
-					(Current.m_Hook != 0);
-				// Aim only influences physics while hook is active. The previous
-				// Cartesian product simulated up to 144 identical no-hook inputs for
-				// every direction/jump pair, causing the large FPS loss.
-				const int AimVariants = Hook ? ConfiguredAimVariants : 1;
-				for(int AimVariant = 0; AimVariant < AimVariants; ++AimVariant)
-				{
-					CNetObj_PlayerInput Candidate = Current;
-					Candidate.m_Direction = DirectionValue;
-					Candidate.m_Jump = g_Config.m_ClZzAvoidJump ? JumpVariant :
-						(Current.m_Jump != 0);
-					Candidate.m_Hook = Hook;
-					if(g_Config.m_ClZzAvoidAim && Hook)
-					{
-						const float Fraction = AimVariants == 1 ? 0.0f :
-							(float)AimVariant / (float)(AimVariants - 1) - 0.5f;
-						const float AimAngle = CurrentAimAngle + Fraction * AimFov;
-						Candidate.m_TargetX =
-							round_to_int(cosf(AimAngle) * AimDistance);
-						Candidate.m_TargetY =
-							round_to_int(sinf(AimAngle) * AimDistance);
-					}
-					AddCandidate(Candidate);
-				}
-			}
-		}
-	}
-
-	// Rank every combination in the lightweight core sandbox, then validate only
-	// the best few in the complete prediction world. This bounds the expensive
-	// work near danger to a handful of worlds instead of up to 150 per tick.
+	const int FastDangerCurrent =
+		SimulateDangerFast(Current, 0, Current, DetectionTicks, false);
 	auto SurvivalTicks = [&](int Danger) {
 		return Danger > 0 ? Danger - 1 : DetectionTicks;
 	};
 	const int CurrentSurvival = SurvivalTicks(DangerCurrent);
-	auto SameInput = [](const CNetObj_PlayerInput &A,
-		const CNetObj_PlayerInput &B) {
-		return A.m_Direction == B.m_Direction &&
-		       (A.m_Jump != 0) == (B.m_Jump != 0) &&
-		       (A.m_Hook != 0) == (B.m_Hook != 0) &&
-		       A.m_TargetX == B.m_TargetX && A.m_TargetY == B.m_TargetY;
+	int BestSurvival = CurrentSurvival;
+	const int SurvivalTolerance = AggressiveProfile || DangerCurrent <= 2 ? 0 :
+		(KogProfile ? 3 : 2);
+	auto InterventionCost = [&](const CNetObj_PlayerInput &Candidate) {
+		const bool DirectionChanged = Candidate.m_Direction != Current.m_Direction;
+		const bool JumpChanged = (Candidate.m_Jump != 0) != (Current.m_Jump != 0);
+		const bool NewHook = Candidate.m_Hook && !Current.m_Hook;
+		return InputDiff(Current, Candidate) + (JumpChanged ? 4 : 0) +
+			(DirectionChanged ? 8 : 0) + (NewHook ? 16 : 0);
 	};
+	bool BestJumpPulse = false;
+	bool BestRescueHook = false;
+	int BestHookReleaseTick = 0;
+	CNetObj_PlayerInput BestInput = Current;
 	struct SAvoidCandidate
 	{
 		CNetObj_PlayerInput m_Input;
+		bool m_JumpPulse;
+		bool m_ReleaseHook;
 		int m_FastSurvival;
 		int m_Diff;
 	};
 	std::vector<SAvoidCandidate> vRanked;
-	vRanked.reserve(vCandidates.size());
-	for(const CNetObj_PlayerInput &Candidate : vCandidates)
+	vRanked.reserve(12);
+	const bool CanTryJump = g_Config.m_ClZzAvoidJump && !Current.m_Jump &&
+		!s_aJumpAwaitingRelease[DummyIndex] && !(pAvoidChar->Core()->m_Jumped & 1);
+	std::array<int, 3> aDirectionValues = {Current.m_Direction,
+		Current.m_Direction, Current.m_Direction};
+	int DirectionVariants = 1;
+	if(g_Config.m_ClZzAvoidDirection)
 	{
-		const int FastDanger = SameInput(Candidate, Current) ? FastDangerCurrent :
-			SimulateDangerFast(Candidate, 0, Candidate, DetectionTicks, true);
-		vRanked.push_back({Candidate, SurvivalTicks(FastDanger),
-			InputDiff(Current, Candidate)});
+		// Confirmed danger has already passed the baseline gate. Do not exclude
+		// lateral escape from a narrow vertical gap merely because input is idle.
+		aDirectionValues = {-1, 0, 1};
+		DirectionVariants = 3;
+	}
+	const int HookVariants = Current.m_Hook ? 2 : 1;
+	const int JumpVariants = CanTryJump ? 2 : 1;
+	for(int DirectionIndex = 0; DirectionIndex < DirectionVariants; ++DirectionIndex)
+	{
+		for(int HookVariant = 0; HookVariant < HookVariants; ++HookVariant)
+		{
+			for(int JumpVariant = 0; JumpVariant < JumpVariants; ++JumpVariant)
+			{
+				CNetObj_PlayerInput Candidate = Current;
+				Candidate.m_Direction = aDirectionValues[DirectionIndex];
+				if(HookVariant)
+					Candidate.m_Hook = 0;
+				const bool JumpPulse = JumpVariant != 0;
+				if(JumpPulse)
+					Candidate.m_Jump = 1;
+				const int Diff = InputDiff(Current, Candidate);
+				if(!Diff)
+					continue; // The unchanged baseline has already been evaluated.
+				bool Duplicate = false;
+				for(const auto &Existing : vRanked)
+					Duplicate |= InputDiff(Existing.m_Input, Candidate) == 0;
+				if(Duplicate)
+					continue;
+				CNetObj_PlayerInput Continuation = Candidate;
+				if(JumpPulse)
+					Continuation.m_Jump = 0;
+				bool Jumped = false;
+				const int Danger = SimulateDangerFast(Candidate, JumpPulse ? 1 : 0,
+					Continuation, DetectionTicks, true, JumpPulse ? &Jumped : nullptr);
+				if(JumpPulse && !Jumped)
+					continue;
+				vRanked.push_back({Candidate, JumpPulse, HookVariant != 0,
+					SurvivalTicks(Danger), Diff});
+			}
+		}
 	}
 	std::stable_sort(vRanked.begin(), vRanked.end(),
 		[](const SAvoidCandidate &A, const SAvoidCandidate &B) {
 			if(A.m_FastSurvival != B.m_FastSurvival)
 				return A.m_FastSurvival > B.m_FastSurvival;
-			return A.m_Diff < B.m_Diff;
+			if(A.m_Diff != B.m_Diff)
+				return A.m_Diff < B.m_Diff;
+			if(A.m_JumpPulse != B.m_JumpPulse)
+				return !A.m_JumpPulse;
+			return !A.m_ReleaseHook && B.m_ReleaseHook;
 		});
-
-	int BestSurvival = CurrentSurvival;
-	int BestDiff = 0;
-	CNetObj_PlayerInput BestInput = Current;
-	int ExactChecks = 0;
-	constexpr int MaxExactCandidates = 5;
-	for(const SAvoidCandidate &Ranked : vRanked)
+	std::vector<int> vExact;
+	vExact.reserve(6);
+	// Reserve a representative for each improving rescue class before filling
+	// the remaining places by rank. At most six general worlds are simulated.
+	for(int RescueClass = 1; RescueClass <= 3; ++RescueClass)
 	{
-		const CNetObj_PlayerInput &Candidate = Ranked.m_Input;
-		if(SameInput(Candidate, Current))
+		for(int Index = 0; Index < (int)vRanked.size(); ++Index)
+		{
+			const auto &Candidate = vRanked[Index];
+			const int Class = (Candidate.m_JumpPulse ? 1 : 0) | (Candidate.m_ReleaseHook ? 2 : 0);
+			if(Class == RescueClass && Candidate.m_FastSurvival > SurvivalTicks(FastDangerCurrent))
+			{
+				vExact.push_back(Index);
+				break;
+			}
+		}
+	}
+	for(int Index = 0; Index < (int)vRanked.size() && vExact.size() < 6; ++Index)
+		if(std::find(vExact.begin(), vExact.end(), Index) == vExact.end())
+			vExact.push_back(Index);
+	std::array<int, 12> aExactSurvival;
+	aExactSurvival.fill(-1);
+	int MaximumSurvival = CurrentSurvival;
+	for(int Index : vExact)
+	{
+		const auto &Ranked = vRanked[Index];
+		CNetObj_PlayerInput Continuation = Ranked.m_Input;
+		if(Ranked.m_JumpPulse)
+			Continuation.m_Jump = 0;
+		bool Jumped = false;
+		const int Danger = SimulateDangerExact(Ranked.m_Input, Ranked.m_JumpPulse ? 1 : 0,
+			Continuation, DetectionTicks, true, Ranked.m_JumpPulse ? &Jumped : nullptr);
+		if(Ranked.m_JumpPulse && !Jumped)
 			continue;
-		const int Danger = SimulateDangerExact(Candidate, 0, Candidate,
-			DetectionTicks, true);
-		ExactChecks++;
 		const int Survival = SurvivalTicks(Danger);
-		const int Diff = Ranked.m_Diff;
-		if(Survival > BestSurvival ||
-			(Survival == BestSurvival && Survival > CurrentSurvival &&
-				Diff < BestDiff))
+		aExactSurvival[Index] = Survival;
+		MaximumSurvival = maximum(MaximumSurvival, Survival);
+	}
+	// Anchor the tolerance to the maximum, rather than chaining pairwise ties.
+	// Never trade a fully surviving option for one with a confirmed collision.
+	const int RequiredSurvival = MaximumSurvival == DetectionTicks ? DetectionTicks :
+		MaximumSurvival - SurvivalTolerance;
+	for(int Index : vExact)
+	{
+		const auto &Ranked = vRanked[Index];
+		const int Survival = aExactSurvival[Index];
+		if(DangerCurrent > MovementReactionTicks ||
+			Survival < RequiredSurvival || Survival <= CurrentSurvival ||
+			(MaximumSurvival < DetectionTicks && MaximumSurvival - CurrentSurvival <= SurvivalTolerance))
+			continue;
+		if(BestSurvival == CurrentSurvival ||
+			InterventionCost(Ranked.m_Input) < InterventionCost(BestInput) ||
+			(InterventionCost(Ranked.m_Input) == InterventionCost(BestInput) && Survival > BestSurvival))
 		{
 			BestSurvival = Survival;
-			BestDiff = Diff;
-			BestInput = Candidate;
+			BestInput = Ranked.m_Input;
+			BestJumpPulse = Ranked.m_JumpPulse;
 		}
-		if(ExactChecks >= MaxExactCandidates)
-			break;
 	}
+
+	// Compare map-hook rescue with the best exact movement/jump candidate.
+	// A held action owns the shared weapon/hook target for every weapon type.
+	if(g_Config.m_ClZzAvoidHookAssist && !AimOwnedByAction && !Current.m_Hook &&
+		BestSurvival < DetectionTicks &&
+		(DangerCurrent <= MovementReactionTicks || MaximumSurvival < DetectionTicks))
+	{
+		// Search the complete physically reachable range. The old hidden range
+		// option could silently stop the ceiling scan too early.
+		const float RescueRange = minimum((float)m_aTuning[DummyIndex].m_HookLength,
+			(float)std::clamp(g_Config.m_ClZzAvoidHookAssistRange, 16, 512));
+		const vec2 RescuePos = pAvoidChar->Core()->m_Pos;
+		const vec2 Velocity = pAvoidChar->Core()->m_Vel;
+		auto FreezeInDirection = [&](const vec2 &Direction) {
+			for(float Distance : {24.0f, 40.0f, 56.0f})
+			{
+				if(DmdIsFreezeNearTee(Collision(), RescuePos + Direction * Distance,
+					pAvoidSwitchers, AvoidTeam))
+					return true;
+			}
+			return false;
+		};
+		const bool FreezeAbove =
+			FreezeInDirection(vec2(0.0f, -1.0f));
+		const bool FreezeBelow =
+			FreezeInDirection(vec2(0.0f, 1.0f));
+		const bool FreezeLeft =
+			FreezeInDirection(vec2(-1.0f, 0.0f));
+		const bool FreezeRight =
+			FreezeInDirection(vec2(1.0f, 0.0f));
+		const bool VerticalFreezeCorridor = FreezeAbove && FreezeBelow;
+		const int TravelDirection = fabsf(Velocity.x) > 0.15f ?
+			(Velocity.x > 0.0f ? 1 : -1) : Current.m_Direction;
+		int RetreatDirection = TravelDirection;
+		// Preserve momentum while the travel side is open. Reverse only when that
+		// side itself contains freeze.
+		if((TravelDirection < 0 && FreezeLeft) ||
+			(TravelDirection > 0 && FreezeRight))
+			RetreatDirection = -TravelDirection;
+		if(RetreatDirection == 0 && VerticalFreezeCorridor)
+			RetreatDirection = Velocity.x >= 0.0f ? -1 : 1;
+		vec2 DesiredPull((float)(RetreatDirection != 0 ? RetreatDirection : 1), 0.0f);
+		if(!VerticalFreezeCorridor)
+		{
+			if(FreezeBelow && !FreezeAbove)
+				DesiredPull.y = -0.65f;
+			else if(FreezeAbove && !FreezeBelow)
+				DesiredPull.y = 0.65f;
+			else if(fabsf(Velocity.y) > 0.25f)
+				DesiredPull.y = Velocity.y > 0.0f ? -0.35f : 0.35f;
+		}
+		if(length(Velocity) > 0.25f)
+		{
+			// Resist the actual current flight vector. This is particularly useful
+			// after a jump toward freeze, where a side wall can otherwise pull the
+			// tee farther along its dangerous arc.
+			DesiredPull -= normalize(Velocity) * (0.20f + RescueAggression * 0.45f);
+		}
+		DesiredPull = normalize(DesiredPull);
+		const float CurrentClearance = DmdFreezeClearance(Collision(), RescuePos,
+			pAvoidSwitchers, AvoidTeam);
+		int BestHookSurvival = -1;
+		int BestHookHoldTicks = 0;
+		int BestHookRelease = 0;
+		float BestHookScore = -1000000.0f;
+		CNetObj_PlayerInput BestHookInput = Current;
+		struct SRescueRay
+		{
+			vec2 m_Direction;
+			float m_Score;
+		};
+		std::vector<SRescueRay> vRescueRays;
+		vRescueRays.reserve(48);
+		// Forty-eight raycasts are cheap (no cloned physics worlds) and provide a
+		// dense 7.5-degree scan that reliably finds narrow hookable surfaces. Lower
+		// rays are allowed, but receive a strong penalty and therefore win only
+		// when exact prediction proves that an upper/side hook cannot save the tee.
+		constexpr int RescueRays = 48;
+		for(int Ray = 0; Ray < RescueRays; ++Ray)
+		{
+			const float Angle = -pi + (2.0f * pi * Ray) / RescueRays;
+			const vec2 Direction(cosf(Angle), sinf(Angle));
+			// Never pull into a nearby freeze band. When both vertical sides are
+			// blocked, use only shallow side hooks that carry the tee through the
+			// corridor instead of oscillating between ceiling and floor.
+			if((FreezeAbove && Direction.y < -0.12f) ||
+				// PreferDownNext is only a shortlist hint. It must never make a
+				// downward pull through an already-dangerous lower freeze band valid.
+				(FreezeBelow && Direction.y > 0.12f) ||
+				(FreezeLeft && Direction.x < -0.12f) ||
+				(FreezeRight && Direction.x > 0.12f) ||
+				(VerticalFreezeCorridor && fabsf(Direction.y) > 0.34f))
+				continue;
+			if(Direction.y > 0.15f && !FreezeAbove && !FreezeBelow)
+				continue;
+			vec2 HitPos;
+			int TeleNumber = 0;
+			const int Hit = Collision()->IntersectLineTeleHook(
+				RescuePos, RescuePos + Direction * RescueRange,
+				&HitPos, nullptr, &TeleNumber);
+			if(Hit == 0 || Hit == TILE_NOHOOK || Hit == TILE_TELEINHOOK ||
+				TeleNumber != 0)
+				continue;
+			// The hook head may safely pass through freeze. Safety of the tee itself
+			// is validated by the exact world simulation below.
+			const float PullScore = dot(Direction, DesiredPull) *
+				(10.0f + RescueAggression * 10.0f);
+			const float HeightScore = -Direction.y * 7.0f;
+			const float DownwardPenalty = maximum(0.0f, Direction.y) * 14.0f;
+			const float DistanceScore = -distance(RescuePos, HitPos) * 0.004f;
+			vRescueRays.push_back({Direction,
+				PullScore + HeightScore - DownwardPenalty + DistanceScore});
+		}
+		std::stable_sort(vRescueRays.begin(), vRescueRays.end(),
+			[](const SRescueRay &A, const SRescueRay &B) {
+				return A.m_Score > B.m_Score;
+			});
+		// PreferDownNext can reserve one downward ray in the exact shortlist after
+		// normal rays. It is deliberately not a score bonus or a permission to
+		// take over input: exact survival and clearance still decide every hook.
+		bool HasPreferredRescueHook = false;
+		int PreferredRescueRayIndex = -1;
+		for(int RayIndex = 0; RayIndex < (int)vRescueRays.size(); ++RayIndex)
+		{
+			const SRescueRay &RescueRay = vRescueRays[RayIndex];
+			const bool PreferredUpward = !FreezeAbove && !VerticalFreezeCorridor &&
+				RescueRay.m_Direction.y < -0.18f;
+			const bool PreferredSide = VerticalFreezeCorridor &&
+				fabsf(RescueRay.m_Direction.y) <= 0.34f &&
+				(RetreatDirection == 0 ||
+					RescueRay.m_Direction.x * RetreatDirection > 0.0f);
+			const bool PreferredDown = s_aRescuePreferDownNext[DummyIndex] &&
+				RescueRay.m_Direction.y > 0.18f;
+			if(!PreferredUpward && !PreferredSide && !PreferredDown)
+				continue;
+			HasPreferredRescueHook = true;
+			PreferredRescueRayIndex = RayIndex;
+			break;
+		}
+
+		// Full world prediction is the expensive part. Reserve one exact check for
+		// the best upward ray so a valid ceiling can never be displaced by side
+		// directions in the geometric shortlist.
+		std::array<int, 6> aExactRayIndices = {-1, -1, -1, -1, -1, -1};
+		int ExactRayChecks = minimum(KogProfile ? 1 : 3, (int)vRescueRays.size());
+		for(int Index = 0; Index < ExactRayChecks; ++Index)
+			aExactRayIndices[Index] = Index;
+		auto AddExactRay = [&](int Index) {
+			if(Index < 0 || ExactRayChecks >= (int)aExactRayIndices.size())
+				return;
+			for(int Selected = 0; Selected < ExactRayChecks; ++Selected)
+			{
+				if(aExactRayIndices[Selected] == Index)
+					return;
+			}
+			aExactRayIndices[ExactRayChecks++] = Index;
+		};
+		if(HasPreferredRescueHook)
+			AddExactRay(PreferredRescueRayIndex);
+		// Reserve distinct pull directions before filling adjacent rays. Keep the
+		// existing six-world budget, but do not spend it on one wall corner.
+		for(int Index = 0; KogProfile && Index < (int)vRescueRays.size() && ExactRayChecks < 4; ++Index)
+		{
+			bool Distinct = true;
+			for(int Selected = 0; Selected < ExactRayChecks; ++Selected)
+				if(dot(vRescueRays[Index].m_Direction,
+					vRescueRays[aExactRayIndices[Selected]].m_Direction) > 0.8660254f)
+					Distinct = false;
+			if(Distinct)
+				AddExactRay(Index);
+		}
+		for(int Index = 0; Index < (int)vRescueRays.size(); ++Index)
+		{
+			if(vRescueRays[Index].m_Direction.y < -0.35f)
+			{
+				AddExactRay(Index);
+				break;
+			}
+		}
+		for(int Index = 0; Index < (int)vRescueRays.size() && ExactRayChecks < 6; ++Index)
+		{
+			if(vRescueRays[Index].m_Direction.y > 0.20f)
+			{
+				AddExactRay(Index);
+				break;
+			}
+		}
+		for(int Index = 0; Index < (int)vRescueRays.size() && ExactRayChecks < 6; ++Index)
+			AddExactRay(Index);
+		for(int Check = 0; Check < ExactRayChecks; ++Check)
+		{
+			const SRescueRay &RescueRay = vRescueRays[aExactRayIndices[Check]];
+			// Six existing directions, three bounded schedules. The horizon includes
+			// flight, attachment, pull and at least eight ticks after release.
+			for(int HoldTicks : {2, 6, 12})
+			{
+				CNetObj_PlayerInput HookInput = Current;
+				HookInput.m_Direction = g_Config.m_ClZzAvoidDirection &&
+									(!KogNarrowPassage || CurrentDirectionApproachesFreeze) ?
+								RetreatDirection :
+								Current.m_Direction;
+				HookInput.m_Hook = 1;
+				HookInput.m_Jump = Current.m_Jump;
+				HookInput.m_TargetX = round_to_int(RescueRay.m_Direction.x * 1000.0f);
+				HookInput.m_TargetY = round_to_int(RescueRay.m_Direction.y * 1000.0f);
+				float MinimumClearance = 0.0f;
+				float EndClearance = 0.0f;
+				SHookTrajectory Trajectory;
+				constexpr int HookPredictionTicks = 48;
+				CNetObj_PlayerInput AfterRelease = Current;
+				AfterRelease.m_Hook = 0;
+				const int HookDanger = SimulateDangerExact(HookInput, 0, AfterRelease,
+					HookPredictionTicks, true, nullptr, &MinimumClearance, &EndClearance,
+					HoldTicks, &Trajectory);
+				if(Trajectory.m_AttachTick < 0 || Trajectory.m_ReleaseTick < 0 ||
+					Trajectory.m_PostReleaseTicks < 8)
+					continue;
+				const int HookSurvival = HookDanger > 0 ? HookDanger - 1 : HookPredictionTicks;
+				// Tie-breaking uses the predicted tee trajectory, not just the ray hit.
+				// A hook that loses clearance or ends closer to freeze is therefore less
+				// attractive even if it looks geometrically higher or nearer.
+				const float BaselineClearance = minimum(CurrentClearance, 96.0f);
+				const float PredictedMinimum = minimum(MinimumClearance, 96.0f);
+				const float PredictedEnd = minimum(EndClearance, 96.0f);
+				const float ClearanceLoss = maximum(0.0f,
+					BaselineClearance - PredictedMinimum);
+				const float ClearanceGain = PredictedEnd - BaselineClearance;
+				const bool DownwardHook = RescueRay.m_Direction.y > 0.18f;
+				// A downward hook is a last-resort correction, never a way to make
+				// the tee grounded or merely slower. It has to preserve both the
+				// worst clearance reached during pull and clearance after release.
+				if(DownwardHook &&
+					(PredictedMinimum + 0.25f < BaselineClearance ||
+						PredictedEnd + 0.25f < BaselineClearance))
+					continue;
+				const float Score = RescueRay.m_Score * 0.1f +
+						    ClearanceGain * (0.35f + RescueAggression * 0.30f) -
+						    ClearanceLoss * (0.85f - RescueAggression * 0.25f) -
+						    Trajectory.m_ControlCost * (KogProfile ? 1.5f : 0.6f) -
+						    HoldTicks * (KogNarrowPassage ? 1.0f : 0.4f) -
+						    (KogNarrowPassage && HookInput.m_Direction != Current.m_Direction ?
+								    8.0f :
+								    0.0f);
+				if(HookSurvival > BestHookSurvival ||
+					(HookSurvival == BestHookSurvival &&
+						(Score > BestHookScore || (Score == BestHookScore && HoldTicks < BestHookHoldTicks))))
+				{
+					BestHookSurvival = HookSurvival;
+					BestHookScore = Score;
+					BestHookInput = HookInput;
+					BestHookHoldTicks = HoldTicks;
+					BestHookRelease = Trajectory.m_ReleaseTick;
+				}
+			}
+		}
+		// Movement candidates keep their original horizon and priority. A longer
+		// hook horizon must not manufacture a survival advantage over them.
+		BestHookSurvival = minimum(BestHookSurvival, DetectionTicks);
+		// The hint is intentionally one-shot. A failed upward phase may request
+		// one exact downward check, but cannot bias all later rescue attempts.
+		s_aRescuePreferDownNext[DummyIndex] = false;
+		if(BestHookSurvival > BestSurvival &&
+			(BestHookSurvival == DetectionTicks || BestHookSurvival > BestSurvival + SurvivalTolerance))
+		{
+			BestInput = BestHookInput;
+			BestSurvival = BestHookSurvival;
+			BestJumpPulse = false;
+			BestRescueHook = true;
+			BestHookReleaseTick = NowTick + BestHookRelease;
+		}
+	}
+
 	if(BestSurvival <= CurrentSurvival)
 		return true;
+	if(BestJumpPulse)
+	{
+		s_aJumpInjectedTick[DummyIndex] = NowTick;
+		s_aJumpAwaitingRelease[DummyIndex] = true;
+	}
+	if(BestRescueHook)
+	{
+		s_aRescueHookActive[DummyIndex] = true;
+		s_aRescueHookTargetX[DummyIndex] = BestInput.m_TargetX;
+		s_aRescueHookTargetY[DummyIndex] = BestInput.m_TargetY;
+		s_aRescueDirection[DummyIndex] = BestInput.m_Direction;
+		s_aRescueHookStartTick[DummyIndex] = NowTick;
+		s_aRescueHookReleaseTick[DummyIndex] = BestHookReleaseTick;
+		s_aRescueSafeTicks[DummyIndex] = 0;
+		if(BestInput.m_TargetY < -180)
+			s_aRescuePreferDownNext[DummyIndex] = true;
+		else if(BestInput.m_TargetY > 180)
+			s_aRescuePreferDownNext[DummyIndex] = false;
+	}
 
 	pInput->m_Direction = BestInput.m_Direction;
 	pInput->m_Jump = BestInput.m_Jump;
 	pInput->m_Hook = BestInput.m_Hook;
 	pInput->m_TargetX = BestInput.m_TargetX;
 	pInput->m_TargetY = BestInput.m_TargetY;
-	if(!g_Config.m_ClZzAvoidSilent && g_Config.m_ClZzAvoidAim)
-		m_Controls.m_aMousePos[DummyIndex] =
-			vec2((float)pInput->m_TargetX, (float)pInput->m_TargetY);
+	// Avoid aiming is always silent; the automatic rescue must never move the
+	// player's visible cursor.
 	m_Controls.m_aInputData[DummyIndex].m_Direction = pInput->m_Direction;
-	m_Controls.m_aInputData[DummyIndex].m_Jump = pInput->m_Jump;
 	m_Controls.m_aInputData[DummyIndex].m_Hook = pInput->m_Hook;
 	m_Controls.m_aInputData[DummyIndex].m_TargetX = pInput->m_TargetX;
 	m_Controls.m_aInputData[DummyIndex].m_TargetY = pInput->m_TargetY;
-	m_Controls.m_aFastInput[DummyIndex].m_Direction = pInput->m_Direction;
-	m_Controls.m_aFastInput[DummyIndex].m_Jump = pInput->m_Jump;
-	m_Controls.m_aFastInput[DummyIndex].m_Hook = pInput->m_Hook;
-	m_Controls.m_aFastInput[DummyIndex].m_TargetX = pInput->m_TargetX;
-	m_Controls.m_aFastInput[DummyIndex].m_TargetY = pInput->m_TargetY;
 	s_aWasOverriding[DummyIndex] = true;
-	s_aOverrideHook[DummyIndex] = pInput->m_Hook;
+	s_aOverrideHook[DummyIndex] = BestRescueHook ? 1 : 0;
 	OverrodeInput = true;
 	CacheOverride();
 	return true;
 }
+
+
 
 void CGameClient::ResetKinetixLaserUnfreeze()
 {
@@ -9757,7 +10381,7 @@ int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)
 			if(AvoidLocalId >= 0 && AvoidAllowed)
 			{
 				bool FinalAvoidOverride = false;
-				ApplyAvoid(pInput, AvoidDummyIndex, AvoidLocalId,
+				ApplyAvoid(pInput, AvoidDummyIndex, AvoidLocalId, false,
 					FinalAvoidOverride);
 			}
 			ApplyKinetixLaserUnfreeze(pInput, AvoidDummyIndex,
