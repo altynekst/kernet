@@ -354,7 +354,6 @@ private:
 		int &OutAction);
 	void FentBotTrainUpdate();
 	bool ApplyAvoid(CNetObj_PlayerInput *pInput, int DummyIndex, int LocalId, bool AimOwnedByAction, bool &OverrodeInput);
-		int LocalId, bool &OverrodeInput);
 	bool ApplyKinetixLaserUnfreeze(CNetObj_PlayerInput *pInput, int DummyIndex,
 		int LocalId);
 	void ResetKinetixLaserUnfreeze();
