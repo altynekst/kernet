@@ -929,17 +929,6 @@ void CMenus::OnInterfacesInit(CGameClient *pClient)
 	m_CommunityIcons.OnInterfacesInit(pClient);
 }
 
-// ===== ZZ_PASSWORD_GATE cmd =====
-static void ConZzPassword(IConsole::IResult *pResult, void *pUserData)
-{
-	CMenus *pSelf = (CMenus *)pUserData;
-	if(str_comp(pResult->GetString(0), "@usertuman1488") == 0)
-		pSelf->m_ZzPasswordOk = true;
-	else
-		pSelf->m_ZzPasswordError = true;
-}
-// ================================
-
 void CMenus::OnInit()
 {
 	if(g_Config.m_ClShowWelcome)
@@ -965,7 +954,6 @@ void CMenus::OnInit()
 	m_ConnectButton.Init(Ui(), -1);
 
 	Console()->Chain("add_favorite", ConchainFavoritesUpdate, this);
-	Console()->Register("zz_password", "s[value]", CFGFLAG_CLIENT, ConZzPassword, this, "Unlock client with password");
 	Console()->Chain("remove_favorite", ConchainFavoritesUpdate, this);
 	Console()->Chain("add_friend", ConchainFriendlistUpdate, this);
 	Console()->Chain("remove_friend", ConchainFriendlistUpdate, this);
@@ -2602,18 +2590,6 @@ void CMenus::OnWindowResize()
 
 void CMenus::OnRender()
 {
-	// ===== ZZ_PASSWORD_GATE =====
-	if(!m_ZzPasswordOk)
-	{
-		Ui()->StartCheck();
-		CUIRect Screen = *Ui()->Screen();
-		ZzRenderPasswordGate(Screen);
-		RenderTools()->RenderCursor(Ui()->MousePos(), 24.0f);
-		Ui()->FinishCheck();
-		Ui()->ClearHotkeys();
-		return;
-	}
-	// ============================
 
 	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
 		SetActive(true);
@@ -2659,41 +2635,6 @@ void CMenus::OnRender()
 
 	Ui()->FinishCheck();
 	Ui()->ClearHotkeys();
-}
-
-void CMenus::ZzRenderPasswordGate(const CUIRect &View)
-{
-	Graphics()->DrawRect(View.x, View.y, View.w, View.h, ColorRGBA(0.05f, 0.05f, 0.08f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
-
-	CUIRect Box, Label, Input, Button;
-	View.VSplitMid(nullptr, &Box);
-	Box.VSplitLeft(420.0f, &Box, nullptr);
-	Box.HSplitTop(View.h / 2.0f - 100.0f, nullptr, &Box);
-	Box.HSplitTop(50.0f, &Label, &Box);
-	Box.HSplitTop(45.0f, &Input, &Box);
-	Box.HSplitTop(15.0f, nullptr, &Box);
-	Box.HSplitTop(45.0f, &Button, &Box);
-
-	Ui()->DoLabel(&Label, "Enter password to continue", 26.0f, TEXTALIGN_MC);
-
-	const bool Enter = Ui()->DoEditBox(&m_ZzPasswordInput, &Input, 18.0f);
-
-	if(Enter)
-	{
-		if(str_comp(m_ZzPasswordInput.GetString(), "@usertuman1488") == 0)
-		{
-			m_ZzPasswordOk = true;
-			m_ZzPasswordError = false;
-		}
-		else
-		{
-			m_ZzPasswordError = true;
-			m_ZzPasswordInput.Set("");
-		}
-	}
-
-	if(m_ZzPasswordError)
-		Ui()->DoLabel(&Button, "Wrong password", 16.0f, TEXTALIGN_MC);
 }
 
 

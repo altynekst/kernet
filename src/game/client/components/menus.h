@@ -62,12 +62,6 @@ public:
 	bool DoLine_RadioMenu(CUIRect &View, const char *pLabel, std::vector<CButtonContainer> &vButtonContainers, const std::vector<const char *> &vLabels, const std::vector<int> &vValues, int &Value);
 	bool DoLine_KeyReader(CUIRect &View, CButtonContainer &ReaderButton, CButtonContainer &ClearButton, const char *pName, const char *pCommand);
 
-	// ===== ZZ_PASSWORD_GATE =====
-	bool m_ZzPasswordOk = false;
-	bool m_ZzPasswordError = false;
-	CLineInput m_ZzPasswordInput;
-	void ZzRenderPasswordGate(const CUIRect &View);
-	// ============================
 
 private:
 	CUi::SColorPickerPopupContext m_ColorPickerPopupContext;
