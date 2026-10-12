@@ -2663,7 +2663,7 @@ void CMenus::OnRender()
 
 void CMenus::ZzRenderPasswordGate(const CUIRect &View)
 {
-	RenderTools()->DrawUIRect(&View, ColorRGBA(0.05f, 0.05f, 0.08f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
+	Graphics()->DrawRect(View.x, View.y, View.w, View.h, ColorRGBA(0.05f, 0.05f, 0.08f, 1.0f), IGraphics::CORNER_NONE, 0.0f);
 
 	CUIRect Box, Label, Input, Button;
 	View.VSplitMid(nullptr, &Box);
@@ -2677,9 +2677,8 @@ void CMenus::ZzRenderPasswordGate(const CUIRect &View)
 	Ui()->DoLabel(&Label, "Enter password to continue", 26.0f, TEXTALIGN_MC);
 
 	const bool Enter = Ui()->DoEditBox(&m_ZzPasswordInput, &Input, 18.0f);
-	const bool Click = Ui()->DoButton_Menu(nullptr, "Enter", 0, &Button);
 
-	if(Enter || Click)
+	if(Enter)
 	{
 		if(str_comp(m_ZzPasswordInput.GetString(), "@usertuman1488") == 0)
 		{
