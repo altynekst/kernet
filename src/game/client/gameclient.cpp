@@ -143,11 +143,12 @@ namespace
 		float BestDistance = std::numeric_limits<float>::infinity();
 		const int CenterX = (int)floorf(Point.x / TileSize);
 		const int CenterY = (int)floorf(Point.y / TileSize);
-		for(int TileY = CenterY - 2; TileY <= CenterY + 2; TileY++)
+		const int R = std::clamp(g_Config.m_ClZzAvoidClearanceRadius, 1, 8);
+		for(int TileY = CenterY - R; TileY <= CenterY + R; TileY++)
 		{
 			if(TileY < 0 || TileY >= pCollision->GetHeight())
 				continue;
-			for(int TileX = CenterX - 2; TileX <= CenterX + 2; TileX++)
+			for(int TileX = CenterX - R; TileX <= CenterX + R; TileX++)
 			{
 				if(TileX < 0 || TileX >= pCollision->GetWidth())
 					continue;
@@ -4185,6 +4186,7 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 	static bool s_aWasOverriding[NUM_DUMMIES] = {};
 	static int s_aOverrideHook[NUM_DUMMIES] = {};
 	static int s_aAnalyzedTick[NUM_DUMMIES] = {-1, -1, -1};
+	static int s_aOverrideStreak[NUM_DUMMIES] = {};
 	static bool s_aCachedOverride[NUM_DUMMIES] = {};
 	static CNetObj_PlayerInput s_aCachedInput[NUM_DUMMIES] = {};
 	static bool s_aRescueHookActive[NUM_DUMMIES] = {};
@@ -4204,6 +4206,7 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 			s_aJumpAwaitingRelease[Index] = false;
 			s_aWasEnabled[Index] = false;
 			s_aWasOverriding[Index] = false;
+			s_aOverrideStreak[Index] = 0;
 			s_aOverrideHook[Index] = 0;
 			s_aAnalyzedTick[Index] = -1;
 			s_aCachedOverride[Index] = false;
@@ -4280,7 +4283,22 @@ bool CGameClient::ApplyAvoid(CNetObj_PlayerInput *pInput,
 	s_aAnalyzedAimOwned[DummyIndex] = AimOwnedByAction;
 	s_aAnalyzedAggressiveProfile[DummyIndex] = AvoidProfile;
 	s_aAnalyzedHookState[DummyIndex] = pAvoidChar->Core()->m_HookState;
-	s_aAnalyzedTick[DummyIndex] = NowTick;
+	// ZZ_STICKY_FIX
+		if(s_aWasOverriding[DummyIndex])
+		{
+			s_aOverrideStreak[DummyIndex]++;
+			if(s_aOverrideStreak[DummyIndex] > std::clamp(g_Config.m_ClZzAvoidOverrideTimeout, 5, 200))
+			{
+				s_aWasOverriding[DummyIndex] = false;
+				s_aOverrideHook[DummyIndex] = 0;
+				s_aOverrideStreak[DummyIndex] = 0;
+			}
+		}
+		else
+		{
+			s_aOverrideStreak[DummyIndex] = 0;
+		}
+		s_aAnalyzedTick[DummyIndex] = NowTick;
 	s_aCachedOverride[DummyIndex] = false;
 	auto CacheOverride = [&]() {
 		// Keep the key/button state untouched. LastData forces the following

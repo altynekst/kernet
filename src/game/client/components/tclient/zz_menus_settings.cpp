@@ -291,6 +291,27 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 				&g_Config.m_ClZzAvoidTriggerTicks, &Button,
 				Localize("Trigger ticks"), 1, 20);
 
+		Inner.HSplitTop(LineSize, &Button, &Inner);
+		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidPingComp,
+			&g_Config.m_ClZzAvoidPingComp, &Button,
+			Localize("Ping compensation %"), 0, 100);
+		Inner.HSplitTop(LineSize, &Button, &Inner);
+		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidPingMaxTicks,
+			&g_Config.m_ClZzAvoidPingMaxTicks, &Button,
+			Localize("Ping max ticks"), 0, 20);
+		Inner.HSplitTop(LineSize, &Button, &Inner);
+		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidOverrideTimeout,
+			&g_Config.m_ClZzAvoidOverrideTimeout, &Button,
+			Localize("Override timeout"), 5, 200);
+		Inner.HSplitTop(LineSize, &Button, &Inner);
+		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidSegmentSteps,
+			&g_Config.m_ClZzAvoidSegmentSteps, &Button,
+			Localize("Segment steps"), 1, 64);
+		Inner.HSplitTop(LineSize, &Button, &Inner);
+		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidClearanceRadius,
+			&g_Config.m_ClZzAvoidClearanceRadius, &Button,
+			Localize("Clearance radius"), 1, 8);
+
 			Inner.HSplitTop(LineSize, &Button, &Inner);
 			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidRescueAggression,
 				&g_Config.m_ClZzAvoidRescueAggression, &Button,
