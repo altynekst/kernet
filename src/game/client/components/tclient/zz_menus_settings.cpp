@@ -1033,7 +1033,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		MainView.VSplitMid(&Left, &Right, 20.0f);
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Left, 498.0f, Localize("Visual effects and animation"),
+			DoFeaturePanel(Left, 720.0f, Localize("Visual effects and animation"),
 				Inner);
 			Inner.HSplitTop(26.0f, &Button, &Inner);
 			static CButtonContainer s_VanillaVisuals;
@@ -1138,7 +1138,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		}
 		{
 			CUIRect Inner, Label;
-			DoFeaturePanel(Left, 362.0f, Localize("Tee Trails"), Inner);
+			DoFeaturePanel(Left, 560.0f, Localize("Tee Trails"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcTeeTrail,
 				Localize("Enable tee trails"), &g_Config.m_TcTeeTrail, &Inner,
 				LineSize);
@@ -1254,7 +1254,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		}
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Right, 116.0f, Localize("Theme and aspect ratio"), Inner);
+			DoFeaturePanel(Right, 140.0f, Localize("Theme and aspect ratio"), Inner);
 			static CButtonContainer s_aThemeButtons[6];
 			for(int ThemeRowIndex = 0; ThemeRowIndex < 2; ++ThemeRowIndex)
 			{
@@ -1310,7 +1310,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		}
 		{
 			CUIRect Inner, PresetRow, DetailLeft, DetailRight;
-			DoFeaturePanel(Right, 252.0f, Localize("Visual profile"), Inner);
+			DoFeaturePanel(Right, 480.0f, Localize("Visual profile"), Inner);
 			Inner.HSplitTop(26.0f, &PresetRow, &Inner);
 			static CButtonContainer s_aVisualPresetButtons[4];
 			const char *apPresetNames[] = {Localize("Clean"), Localize("Balanced"),
@@ -1387,7 +1387,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		}
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Right, 116.0f, Localize("Weapon effect colors"), Inner);
+			DoFeaturePanel(Right, 140.0f, Localize("Weapon effect colors"), Inner);
 			static CButtonContainer s_HammerColor, s_GunColor, s_LaserColor,
 				s_GrenadeColor;
 			DoLine_ColorPicker(&s_HammerColor, 25.0f, 13.0f, 3.0f, &Inner,
