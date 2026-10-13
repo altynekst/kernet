@@ -1090,6 +1090,26 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			Ui()->DoScrollbarOption(&g_Config.m_ClZzCursorTrailParticles,
 				&g_Config.m_ClZzCursorTrailParticles, &Button,
 				Localize("Trail sparkle"), 0, 100);
+
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzCursorTrailAlpha,
+				&g_Config.m_ClZzCursorTrailAlpha, &Button,
+				Localize("Trail alpha"), 0, 100);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzCursorTrailFrames,
+				&g_Config.m_ClZzCursorTrailFrames, &Button,
+				Localize("Trail frames"), 8, 64);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzCursorTrailMode,
+				&g_Config.m_ClZzCursorTrailMode, &Button,
+				Localize("Trail mode 0=line 1=dots 2=both"), 0, 2);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ClZzCursorTrailSamplingFps,
+				&g_Config.m_ClZzCursorTrailSamplingFps, &Button,
+				Localize("Trail sampling fps"), 10, 120);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_ClZzCursorTrailDisableMovement, Localize("Freeze trail"),
+				&g_Config.m_ClZzCursorTrailDisableMovement, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_ClZzClickBursts, Localize("Click ripple"),
 				&g_Config.m_ClZzClickBursts, &Inner, LineSize);

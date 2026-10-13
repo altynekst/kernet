@@ -22,7 +22,7 @@ public:
 	bool OnInput(const IInput::CEvent &Event) override;
 
 private:
-	static constexpr int CURSOR_TRAIL_POINTS = 48;
+	static constexpr int CURSOR_TRAIL_POINTS = 64;
 	static constexpr int CLICK_BURST_COUNT = 6;
 	static constexpr int FEATURE_TOAST_COUNT = 5;
 	struct SClickBurst
@@ -40,6 +40,7 @@ private:
 
 	bool m_PaletteInitialized = false;
 	bool m_CursorTrailInitialized = false;
+	float m_CursorTrailLastSampleTime = 0.0f;
 	vec2 m_aCursorTrail[CURSOR_TRAIL_POINTS] = {};
 	SClickBurst m_aClickBursts[CLICK_BURST_COUNT] = {};
 	int m_NextClickBurst = 0;

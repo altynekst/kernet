@@ -266,7 +266,15 @@ void CZZVisualEffects::RenderCursorTrail(float ScreenW, float ScreenH,
 		return;
 	}
 
-	m_aCursorTrail[0] = MousePos;
+	if(g_Config.m_ClZzCursorTrailSamplingFps < 120)
+        {
+                const float NowT = LocalTime();
+                const float Interval = 1.0f / (float)std::max(1, g_Config.m_ClZzCursorTrailSamplingFps);
+                if(NowT - m_CursorTrailLastSampleTime < Interval)
+                        return;
+                m_CursorTrailLastSampleTime = NowT;
+        }
+        m_aCursorTrail[0] = MousePos;
 	const float DeltaTime = std::clamp(Client()->RenderFrameTime(), 0.0f, 0.05f);
 	for(int i = 1; i < CURSOR_TRAIL_POINTS; ++i)
 	{
@@ -279,6 +287,7 @@ void CZZVisualEffects::RenderCursorTrail(float ScreenW, float ScreenH,
 	for(int i = 1; i < TrailPoints; ++i)
 		TotalLength += distance(m_aCursorTrail[i - 1], m_aCursorTrail[i]);
 	const float Energy = std::clamp(TotalLength / 42.0f, 0.0f, 1.0f);
+        const float AlphaScale = std::clamp(g_Config.m_ClZzCursorTrailAlpha / 100.0f, 0.0f, 1.0f);
 	if(Energy <= 0.01f)
 		return;
 
@@ -358,14 +367,14 @@ void CZZVisualEffects::RenderCursorTrail(float ScreenW, float ScreenH,
 	}
 
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(m_Accent.WithAlpha(0.10f * Strength * Energy));
+	Graphics()->SetColor(m_Accent.WithAlpha(0.10f * Strength * Energy * AlphaScale));
 	Graphics()->QuadsDrawFreeform(aGlow, NumSegments);
 	Graphics()->SetColor(ZZThemeLerp(m_Accent, m_AccentAlt, 0.42f)
-			.WithAlpha(0.40f * Strength * Energy));
+			.WithAlpha(0.40f * Strength * Energy * AlphaScale));
 	Graphics()->QuadsDrawFreeform(aCore, NumSegments);
-	Graphics()->SetColor(m_Accent.WithAlpha(0.52f * Strength * Energy));
+	Graphics()->SetColor(m_Accent.WithAlpha(0.52f * Strength * Energy * AlphaScale));
 	Graphics()->QuadsDrawTL(aAccentSparks, NumAccentSparks);
-	Graphics()->SetColor(m_AccentAlt.WithAlpha(0.42f * Strength * Energy));
+	Graphics()->SetColor(m_AccentAlt.WithAlpha(0.42f * Strength * Energy * AlphaScale));
 	Graphics()->QuadsDrawTL(aAltSparks, NumAltSparks);
 	Graphics()->QuadsEnd();
 }
