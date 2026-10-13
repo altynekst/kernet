@@ -894,6 +894,21 @@ MACRO_CONFIG_INT(ClZzAvoidSilent, cl_zz_avoid_silent, 1, 0, 1,
 MACRO_CONFIG_INT(ClZzAvoidTicks, cl_zz_avoid_ticks, 10, 1, 20,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"Avoid: simulation ticks per candidate")
+MACRO_CONFIG_INT(ClZzAvoidPingComp, cl_zz_avoid_ping_comp, 0, 0, 100,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"KernelNet avoid: ping compensation percent (0=off, 100=full ping)")
+MACRO_CONFIG_INT(ClZzAvoidPingMaxTicks, cl_zz_avoid_ping_max_ticks, 6, 0, 20,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"KernelNet avoid: max ticks added by ping compensation")
+MACRO_CONFIG_INT(ClZzAvoidOverrideTimeout, cl_zz_avoid_override_timeout, 30, 5, 200,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"KernelNet avoid: max ticks override before forced re-evaluation")
+MACRO_CONFIG_INT(ClZzAvoidSegmentSteps, cl_zz_avoid_segment_steps, 32, 1, 64,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"KernelNet avoid: max substeps in freeze segment test")
+MACRO_CONFIG_INT(ClZzAvoidClearanceRadius, cl_zz_avoid_clearance_radius, 3, 1, 8,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"KernelNet avoid: clearance scan radius in tiles")
 MACRO_CONFIG_INT(ClZzAvoidTriggerTicks, cl_zz_avoid_trigger_ticks, 3, 1, 20,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"Avoid: danger trigger prediction ticks")
