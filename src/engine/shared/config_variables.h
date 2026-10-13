@@ -697,6 +697,21 @@ MACRO_CONFIG_INT(ClZzCursorTrailLength, cl_zz_cursor_trail_length, 55, 10, 100,
 MACRO_CONFIG_INT(ClZzCursorTrailSize, cl_zz_cursor_trail_size, 50, 10, 100,
 	CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"KernelNet cursor trail thickness")
+MACRO_CONFIG_INT(ClZzCursorTrailAlpha, cl_zz_cursor_trail_alpha, 100, 0, 100,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"Cursor trail: overall opacity (0-100)")
+MACRO_CONFIG_INT(ClZzCursorTrailFrames, cl_zz_cursor_trail_frames, 48, 8, 64,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"Cursor trail: number of points (8-64)")
+MACRO_CONFIG_INT(ClZzCursorTrailMode, cl_zz_cursor_trail_mode, 0, 0, 2,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"Cursor trail mode: 0=line, 1=dots, 2=both")
+MACRO_CONFIG_INT(ClZzCursorTrailSamplingFps, cl_zz_cursor_trail_sampling_fps, 60, 10, 120,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"Cursor trail: sampling fps (10-120)")
+MACRO_CONFIG_INT(ClZzCursorTrailDisableMovement, cl_zz_cursor_trail_disable_movement, 0, 0, 1,
+	CFGFLAG_CLIENT | CFGFLAG_SAVE,
+	"Cursor trail: freeze trail when mouse moves")
 MACRO_CONFIG_INT(ClZzCursorTrailParticles, cl_zz_cursor_trail_particles, 45, 0,
 	100, CFGFLAG_CLIENT | CFGFLAG_SAVE,
 	"KernelNet cursor trail sparkle amount")
