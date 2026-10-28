@@ -110,31 +110,6 @@ namespace
 	};
 
 	static SRow s_aMovementRows[] = {
-		{ERowType::TOGGLE, "Avoid", &CConfig::m_ClZzAvoidEnabled, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Freeze", &CConfig::m_ClZzAvoidFreeze, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Teleport", &CConfig::m_ClZzAvoidTele, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Death", &CConfig::m_ClZzAvoidKill, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Direction", &CConfig::m_ClZzAvoidDirection, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Jump", &CConfig::m_ClZzAvoidJump, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Hook", &CConfig::m_ClZzAvoidHookAssist, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Aim", &CConfig::m_ClZzAvoidAim, 0, 1, 1, nullptr, 0},
-		{ERowType::SLIDER, "Aim FOV", &CConfig::m_ClZzAvoidFov, 5, 360, 5,
-			nullptr, 0},
-		{ERowType::SLIDER, "Aim angles", &CConfig::m_ClZzAvoidAngles, 1, 16, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Silent", &CConfig::m_ClZzAvoidSilent, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::SLIDER, "Simulation ticks", &CConfig::m_ClZzAvoidTicks, 1, 20,
-			1, nullptr, 0},
-		{ERowType::SLIDER, "Trigger ticks", &CConfig::m_ClZzAvoidTriggerTicks, 1,
-			20, 1, nullptr, 0},
 		{ERowType::TOGGLE, "Balance bot", &CConfig::m_ClZzBalanceBot, 0, 1, 1,
 			nullptr, 0},
 		{ERowType::TOGGLE, "Fly", &CConfig::m_ClZzFlyHelperEnabled, 0, 1, 1,
@@ -239,8 +214,6 @@ namespace
 			nullptr, 0, "toggle cl_zz_fng_auto_laser 0 1", &CConfig::m_ClZzFngAutoLaserMod},
 		{ERowType::KEYBIND, "Auto unfreeze", &CConfig::m_ClZzAutoUnfreezeKey, 0, 512, 1,
 			nullptr, 0, "toggle cl_zz_auto_unfreeze 0 1", &CConfig::m_ClZzAutoUnfreezeMod},
-		{ERowType::KEYBIND, "Avoid", &CConfig::m_ClZzAvoidToggleKey, 0, 512, 1,
-			nullptr, 0, "toggle cl_zz_avoid_enabled 0 1", &CConfig::m_ClZzAvoidToggleMod},
 		{ERowType::KEYBIND, "Hook drive", &CConfig::m_ClZzFlyRideKey, 0, 512, 1,
 			nullptr, 0, "toggle cl_zz_fly_ride 0 1", &CConfig::m_ClZzFlyRideMod},
 		{ERowType::KEYBIND, "Grenade save", &CConfig::m_ClKnGrenadeSaveKey, 0, 512, 1,
@@ -807,8 +780,6 @@ void CZZClickGui::HandleMouseDown()
 				if(Row.m_Type == ERowType::TOGGLE)
 				{
 					Value = Value ? 0 : 1;
-					if(Row.m_pValue == &CConfig::m_ClZzAvoidEnabled && Value)
-						g_Config.m_ClZzAvoidFreeze = 1;
 				}
 				else if(Row.m_Type == ERowType::MODE)
 				{

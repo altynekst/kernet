@@ -2684,6 +2684,8 @@ if(CLIENT)
     components/voting.h
     components/zz_clickgui.cpp
     components/zz_clickgui.h
+    components/avoidblatant.cpp
+    components/avoidblatant.h
     components/zz_newyearmenu.cpp
     components/zz_newyearmenu.h
     components/zz_hook_aimbot.cpp

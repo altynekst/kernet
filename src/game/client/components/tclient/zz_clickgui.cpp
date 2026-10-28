@@ -115,20 +115,6 @@ namespace
 			1, nullptr, 0},
 		{ERowType::TOGGLE, "Balance bot", &CConfig::m_ClZzBalanceBot, 0, 1, 1,
 			nullptr, 0},
-		{ERowType::TOGGLE, "Avoid freeze", &CConfig::m_ClZzAvoidEnabled, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Avoid tele", &CConfig::m_ClZzAvoidTele, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Avoid kill", &CConfig::m_ClZzAvoidKill, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Hook assist", &CConfig::m_ClZzAvoidHookAssist, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::TOGGLE, "Avoid jump", &CConfig::m_ClZzAvoidJump, 0, 1, 1,
-			nullptr, 0},
-		{ERowType::SLIDER, "Lookahead", &CConfig::m_ClZzAvoidLookahead, 4, 128, 4,
-			nullptr, 0},
-		{ERowType::SLIDER, "Hook range", &CConfig::m_ClZzAvoidHookAssistRange, 16,
-			512, 16, nullptr, 0},
 	};
 
 	static SRow s_aUtilityRows[] = {
@@ -590,8 +576,6 @@ void CZZClickGui::HandleMouseDown()
 				if(Row.m_Type == ERowType::TOGGLE)
 				{
 					Value = Value ? 0 : 1;
-					if(Row.m_pValue == &CConfig::m_ClZzAvoidEnabled && Value)
-						g_Config.m_ClZzAvoidFreeze = 1;
 				}
 				else if(Row.m_Type == ERowType::MODE)
 				{

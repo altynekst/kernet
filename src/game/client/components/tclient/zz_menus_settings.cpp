@@ -246,115 +246,44 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		CUIRect Left, Right;
 		MainView.VSplitMid(&Left, &Right, 20.0f);
 
-		// Left: Avoid + Hammer-gun
+		// Left: Avoid blatant + Hammer-gun
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Left, 385.0f, Localize("Avoid"), Inner);
+			DoFeaturePanel(Left, 270.0f, Localize("Avoid blatant"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidEnabled, Localize("Avoid freeze enabled?"),
-				&g_Config.m_ClZzAvoidEnabled, &Inner, LineSize);
+				&g_Config.m_AvoidBlatantEnabled, Localize("Включить авойд"),
+				&g_Config.m_AvoidBlatantEnabled, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidFreeze, Localize("Avoid freeze"),
-				&g_Config.m_ClZzAvoidFreeze, &Inner, LineSize);
+				&g_Config.m_AvoidBlatantFreeze, Localize("Обходить фриз"),
+				&g_Config.m_AvoidBlatantFreeze, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidTele, Localize("Avoid tele"),
-				&g_Config.m_ClZzAvoidTele, &Inner, LineSize);
+				&g_Config.m_AvoidBlatantDeath, Localize("Обходить смерть и край карты"),
+				&g_Config.m_AvoidBlatantDeath, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidKill, Localize("Avoid kill"),
-				&g_Config.m_ClZzAvoidKill, &Inner, LineSize);
+				&g_Config.m_AvoidBlatantTele, Localize("Обходить телепорты"),
+				&g_Config.m_AvoidBlatantTele, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidDirection, Localize("Direction"),
-				&g_Config.m_ClZzAvoidDirection, &Inner, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidJump, Localize("Jump"),
-				&g_Config.m_ClZzAvoidJump, &Inner, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidHookAssist, Localize("Hook"),
-				&g_Config.m_ClZzAvoidHookAssist, &Inner, LineSize);
-			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidAim, Localize("Aim"),
-				&g_Config.m_ClZzAvoidAim, &Inner, LineSize);
+				&g_Config.m_AvoidBlatantHookAssist, Localize("Помощь хуком (только по прицелу)"),
+				&g_Config.m_AvoidBlatantHookAssist, &Inner, LineSize);
 			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidFov,
-				&g_Config.m_ClZzAvoidFov, &Button, Localize("Aim FOV"), 5, 360);
+			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantPredictTicks,
+				&g_Config.m_AvoidBlatantPredictTicks, &Button,
+				Localize("Предсказание (тиков)"), 1, 60);
 			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidAngles,
-				&g_Config.m_ClZzAvoidAngles, &Button, Localize("Aim angles"), 1,
-				144);
+			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantCommitTicks,
+				&g_Config.m_AvoidBlatantCommitTicks, &Button,
+				Localize("Удержание плана (тиков)"), 1, 20);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidSilent, Localize("Silent"),
-				&g_Config.m_ClZzAvoidSilent, &Inner, LineSize);
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidTicks,
-				&g_Config.m_ClZzAvoidTicks, &Button, Localize("Simulation ticks"),
-				1, 20);
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidTriggerTicks,
-				&g_Config.m_ClZzAvoidTriggerTicks, &Button,
-				Localize("Trigger ticks"), 1, 20);
-
-		Inner.HSplitTop(LineSize, &Button, &Inner);
-		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidPingComp,
-			&g_Config.m_ClZzAvoidPingComp, &Button,
-			Localize("Ping compensation %"), 0, 100);
-		Inner.HSplitTop(LineSize, &Button, &Inner);
-		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidPingMaxTicks,
-			&g_Config.m_ClZzAvoidPingMaxTicks, &Button,
-			Localize("Ping max ticks"), 0, 20);
-		Inner.HSplitTop(LineSize, &Button, &Inner);
-		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidOverrideTimeout,
-			&g_Config.m_ClZzAvoidOverrideTimeout, &Button,
-			Localize("Override timeout"), 5, 200);
-		Inner.HSplitTop(LineSize, &Button, &Inner);
-		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidSegmentSteps,
-			&g_Config.m_ClZzAvoidSegmentSteps, &Button,
-			Localize("Segment steps"), 1, 64);
-		Inner.HSplitTop(LineSize, &Button, &Inner);
-		Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidClearanceRadius,
-			&g_Config.m_ClZzAvoidClearanceRadius, &Button,
-			Localize("Clearance radius"), 1, 8);
-
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidRescueAggression,
-				&g_Config.m_ClZzAvoidRescueAggression, &Button,
-				Localize("Rescue aggression"), 0, 100);
+				&g_Config.m_AvoidBlatantVisualPath, Localize("Показывать путь"),
+				&g_Config.m_AvoidBlatantVisualPath, &Inner, LineSize);
 			DoButton_CheckBoxAutoVMarginAndSet(
-				&g_Config.m_ClZzAvoidKogProfile, Localize("KOG profile"),
-				&g_Config.m_ClZzAvoidKogProfile, &Inner, LineSize);
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			Ui()->DoScrollbarOption(&g_Config.m_ClZzAvoidAggressiveProfile,
-				&g_Config.m_ClZzAvoidAggressiveProfile, &Button,
-				Localize("Aggressive profile"), 0, 2);
+				&g_Config.m_AvoidBlatantDebug, Localize("Отладочная строка"),
+				&g_Config.m_AvoidBlatantDebug, &Inner, LineSize);
 			Inner.HSplitTop(5.0f, nullptr, &Inner);
 			Inner.HSplitTop(LineSize, &Label, &Inner);
-			Ui()->DoLabel(&Label, Localize("Avoid toggle keybind"), 14.0f,
+			Ui()->DoLabel(&Label,
+				Localize("Уступает Laser unfreeze и Auto ALED."), 14.0f,
 				TEXTALIGN_ML);
-			Inner.HSplitTop(LineSize, &Button, &Inner);
-			static CButtonContainer s_AvoidKeyReader;
-			static CButtonContainer s_AvoidKeyClear;
-			CBindSlot CurrentBindAvoid((int)g_Config.m_ClZzAvoidToggleKey,
-				(int)g_Config.m_ClZzAvoidToggleMod);
-			const auto ResAvoid = GameClient()->m_KeyBinder.DoKeyReader(
-				&s_AvoidKeyReader, &s_AvoidKeyClear, &Button, CurrentBindAvoid,
-				false);
-			if(!ResAvoid.m_Aborted &&
-				(ResAvoid.m_Bind.m_Key != CurrentBindAvoid.m_Key ||
-					ResAvoid.m_Bind.m_ModifierMask != CurrentBindAvoid.m_ModifierMask))
-			{
-				if(CurrentBindAvoid.m_Key >= KEY_FIRST &&
-					CurrentBindAvoid.m_Key < KEY_LAST)
-					GameClient()->m_Binds.Bind(CurrentBindAvoid.m_Key, "", false,
-						CurrentBindAvoid.m_ModifierMask);
-				g_Config.m_ClZzAvoidToggleKey = ResAvoid.m_Bind.m_Key;
-				g_Config.m_ClZzAvoidToggleMod = ResAvoid.m_Bind.m_ModifierMask;
-				if(ResAvoid.m_Bind.m_Key >= KEY_FIRST &&
-					ResAvoid.m_Bind.m_Key < KEY_LAST)
-					GameClient()->m_Binds.Bind(ResAvoid.m_Bind.m_Key, "toggle cl_zz_avoid_enabled 0 1",
-						false, ResAvoid.m_Bind.m_ModifierMask);
-			}
-			Inner.HSplitTop(5.0f, nullptr, &Inner);
-			Inner.HSplitTop(LineSize, &Label, &Inner);
-			Ui()->DoLabel(&Label, Localize("Обходит фриз."), 14.0f, TEXTALIGN_ML);
 		}
 		{
 			CUIRect Inner;

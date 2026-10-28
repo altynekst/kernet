@@ -3855,12 +3855,6 @@ void CMenus::RenderSettingsDDNet(CUIRect MainView)
 
 	Ui()->DoLabel(&Label, Localize("Miscellaneous"), 20.0f, TEXTALIGN_ML);
 
-	Miscellaneous.HSplitTop(20.0f, &Button, &Miscellaneous);
-	if(DoButton_CheckBox(&g_Config.m_ClZzAvoidJump,
-		   Localize("Avoid freeze jump"), g_Config.m_ClZzAvoidJump,
-		   &Button))
-		g_Config.m_ClZzAvoidJump ^= 1;
-
 	static CButtonContainer s_ButtonTimeout;
 	Miscellaneous.HSplitTop(20.0f, &Button, &Miscellaneous);
 	if(DoButton_Menu(&s_ButtonTimeout, Localize("New random timeout code"), 0,

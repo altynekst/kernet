@@ -324,8 +324,6 @@ void CBinds::OnConsoleInit()
 	// KernelNet: re-apply saved keybinds after defaults (defaults unbinds all).
 	if(g_Config.m_ClZzAimbotKey >= KEY_FIRST && g_Config.m_ClZzAimbotKey < KEY_LAST)
 		Bind(g_Config.m_ClZzAimbotKey, "toggle cl_zz_aimbot_enabled 0 1", false, g_Config.m_ClZzAimbotMod);
-	if(g_Config.m_ClZzAvoidToggleKey >= KEY_FIRST && g_Config.m_ClZzAvoidToggleKey < KEY_LAST)
-		Bind(g_Config.m_ClZzAvoidToggleKey, "toggle cl_zz_avoid_enabled 0 1", false, g_Config.m_ClZzAvoidToggleMod);
 	if(g_Config.m_ClZzSaveInBlockKey >= KEY_FIRST && g_Config.m_ClZzSaveInBlockKey < KEY_LAST)
 		Bind(g_Config.m_ClZzSaveInBlockKey, "+zz_tile_aimbot", false, g_Config.m_ClZzSaveInBlockMod);
 	if(g_Config.m_ClZzFentBotWaypointKey >= KEY_FIRST && g_Config.m_ClZzFentBotWaypointKey < KEY_LAST)

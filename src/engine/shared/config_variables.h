@@ -860,79 +860,15 @@ MACRO_CONFIG_INT(ClZzBalanceBot, cl_zz_balance_bot, 0, 0, 1,
 	"KernelNet balance bot: stabilize the local tee while "
 	"standing on another tee")
 
-MACRO_CONFIG_INT(ClZzAvoidEnabled, cl_zz_avoid_enabled, 0, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid hazards enabled")
-MACRO_CONFIG_INT(ClZzAvoidToggleKey, cl_zz_avoid_toggle_key, 0, 0, 512,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid bind key (internal)")
-MACRO_CONFIG_INT(ClZzAvoidToggleMod, cl_zz_avoid_toggle_mod, 0, 0, 7,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid bind modifier mask (internal)")
-MACRO_CONFIG_INT(ClZzAvoidFreeze, cl_zz_avoid_freeze, 1, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE, "KernelNet avoid freeze tiles")
-MACRO_CONFIG_INT(ClZzAvoidTele, cl_zz_avoid_tele, 0, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid teleporter tiles")
-MACRO_CONFIG_INT(ClZzAvoidKill, cl_zz_avoid_kill, 1, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE, "KernelNet avoid kill tiles")
-MACRO_CONFIG_INT(ClZzAvoidLookahead, cl_zz_avoid_lookahead, 24, 4, 128,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid lookahead distance (pixels)")
-MACRO_CONFIG_INT(ClZzAvoidHookAssist, cl_zz_avoid_hook_assist, 1, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid hook assist enabled")
-MACRO_CONFIG_INT(ClZzAvoidHookAssistRange, cl_zz_avoid_hook_assist_range, 384,
-	16, 512, CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid hook assist hazard scan range (pixels)")
-MACRO_CONFIG_INT(ClZzAvoidRescueAggression, cl_zz_avoid_rescue_aggression, 50,
-        0, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE,
-        "Avoid: rescue hook aggression (0-100)")
-MACRO_CONFIG_INT(ClZzAvoidKogProfile, cl_zz_avoid_kog_profile, 0, 0, 1,
-        CFGFLAG_CLIENT | CFGFLAG_SAVE,
-        "Avoid: KOG profile (narrow passage tuning)")
-MACRO_CONFIG_INT(ClZzAvoidAggressiveProfile, cl_zz_avoid_aggressive_profile, 0, 0, 2,
-        CFGFLAG_CLIENT | CFGFLAG_SAVE,
-        "Avoid: aggression profile (0=off 1=aggressive 2=maximum)")
-MACRO_CONFIG_INT(ClZzAvoidDirection, cl_zz_avoid_direction, 1, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: allow direction changes")
-MACRO_CONFIG_INT(ClZzAvoidJump, cl_zz_avoid_jump, 1, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: allow jump changes")
-MACRO_CONFIG_INT(ClZzAvoidAim, cl_zz_avoid_aim, 0, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: allow hook aim changes")
-MACRO_CONFIG_INT(ClZzAvoidFov, cl_zz_avoid_fov, 90, 5, 360,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: hook aim field of view")
-MACRO_CONFIG_INT(ClZzAvoidAngles, cl_zz_avoid_angles, 9, 1, 144,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: hook aim angles")
-MACRO_CONFIG_INT(ClZzAvoidSilent, cl_zz_avoid_silent, 1, 0, 1,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: keep the visible cursor unchanged")
-MACRO_CONFIG_INT(ClZzAvoidTicks, cl_zz_avoid_ticks, 10, 1, 20,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: simulation ticks per candidate")
-MACRO_CONFIG_INT(ClZzAvoidPingComp, cl_zz_avoid_ping_comp, 0, 0, 100,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid: ping compensation percent (0=off, 100=full ping)")
-MACRO_CONFIG_INT(ClZzAvoidPingMaxTicks, cl_zz_avoid_ping_max_ticks, 6, 0, 20,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid: max ticks added by ping compensation")
-MACRO_CONFIG_INT(ClZzAvoidOverrideTimeout, cl_zz_avoid_override_timeout, 30, 5, 200,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid: max ticks override before forced re-evaluation")
-MACRO_CONFIG_INT(ClZzAvoidSegmentSteps, cl_zz_avoid_segment_steps, 32, 1, 64,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid: max substeps in freeze segment test")
-MACRO_CONFIG_INT(ClZzAvoidClearanceRadius, cl_zz_avoid_clearance_radius, 3, 1, 8,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"KernelNet avoid: clearance scan radius in tiles")
-MACRO_CONFIG_INT(ClZzAvoidTriggerTicks, cl_zz_avoid_trigger_ticks, 3, 1, 20,
-	CFGFLAG_CLIENT | CFGFLAG_SAVE,
-	"Avoid: danger trigger prediction ticks")
+MACRO_CONFIG_INT(AvoidBlatantEnabled, avoid_blatant_enabled, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: enable")
+MACRO_CONFIG_INT(AvoidBlatantFreeze, avoid_blatant_freeze, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: avoid freeze tiles")
+MACRO_CONFIG_INT(AvoidBlatantDeath, avoid_blatant_death, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: avoid death tiles")
+MACRO_CONFIG_INT(AvoidBlatantTele, avoid_blatant_tele, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: avoid teleporters")
+MACRO_CONFIG_INT(AvoidBlatantHookAssist, avoid_blatant_hook_assist, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: hook assist")
+MACRO_CONFIG_INT(AvoidBlatantPredictTicks, avoid_blatant_predict_ticks, 10, 1, 60, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: predict ticks")
+MACRO_CONFIG_INT(AvoidBlatantCommitTicks, avoid_blatant_commit_ticks, 4, 1, 20, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: commit ticks")
+MACRO_CONFIG_INT(AvoidBlatantVisualPath, avoid_blatant_visual_path, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: show predicted path")
+MACRO_CONFIG_INT(AvoidBlatantDebug, avoid_blatant_debug, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: show debug")
 
 
 MACRO_CONFIG_INT(ClKnTileAlign, cl_kn_05, 0, 0, 1,

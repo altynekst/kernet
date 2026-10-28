@@ -630,8 +630,8 @@ void CHud::RenderTextInfo(bool ShowSystemInfo)
 			vLines.push_back("Auto ALED");
 		if(g_Config.m_ClZzFlyHelperEnabled)
 			vLines.push_back("Fly");
-		if(g_Config.m_ClZzAvoidEnabled)
-			vLines.push_back("Avoid");
+		if(g_Config.m_AvoidBlatantEnabled)
+			vLines.push_back("Avoid blatant");
 		if(g_Config.m_ClZzBalanceBot)
 			vLines.push_back("Balance");
 		if(g_Config.m_ClZzAutoUnfreeze)
@@ -654,7 +654,7 @@ void CHud::RenderTextInfo(bool ShowSystemInfo)
 			vLines.push_back("Hook aim");
 		if(g_Config.m_ClZzSaveInBlockSilent)
 			vLines.push_back("Hook tile [silent]");
-		if(g_Config.m_ClZzAvoidEnabled && g_Config.m_ClZzAvoidHookAssist)
+		if(g_Config.m_AvoidBlatantEnabled && g_Config.m_AvoidBlatantHookAssist)
 			vLines.push_back("Avoid hook assist");
 		if(g_Config.m_ClZzFlyRide)
 			vLines.push_back("Hook drive");

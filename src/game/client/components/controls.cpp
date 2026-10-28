@@ -257,12 +257,6 @@ void CControls::OnConsoleInit()
 		Console()->Register("zz_aimbot_toggle", "", CFGFLAG_CLIENT, ConKeyToggle, &s_ToggleLegacy, "KernelNet: toggle aimbot (legacy)");
 	}
 	{
-		static CInputToggleOnce s_Toggle = {&g_Config.m_ClZzAvoidEnabled, false};
-		static CInputToggle s_ToggleLegacy = {&g_Config.m_ClZzAvoidEnabled};
-		Console()->Register("+zz_avoid_toggle", "", CFGFLAG_CLIENT, ConKeyToggleOnce, &s_Toggle, "KernelNet: toggle avoid freeze");
-		Console()->Register("zz_avoid_toggle", "", CFGFLAG_CLIENT, ConKeyToggle, &s_ToggleLegacy, "KernelNet: toggle avoid freeze (legacy)");
-	}
-	{
 		static CFentBotWaypointKey s_Key = {this, GameClient(), false};
 		Console()->Register("+zz_fentbot_waypoint", "", CFGFLAG_CLIENT, ConKeyFentBotWaypoint, &s_Key, "KernelNet: set/clear FentBot waypoint");
 	}
@@ -275,8 +269,6 @@ void CControls::OnConsoleInit()
 	// Re-apply saved keybind (if any).
 	if(g_Config.m_ClZzAimbotKey >= KEY_FIRST && g_Config.m_ClZzAimbotKey < KEY_LAST)
 		GameClient()->m_Binds.Bind(g_Config.m_ClZzAimbotKey, "toggle cl_zz_aimbot_enabled 0 1", false, g_Config.m_ClZzAimbotMod);
-	if(g_Config.m_ClZzAvoidToggleKey >= KEY_FIRST && g_Config.m_ClZzAvoidToggleKey < KEY_LAST)
-		GameClient()->m_Binds.Bind(g_Config.m_ClZzAvoidToggleKey, "toggle cl_zz_avoid_enabled 0 1", false, g_Config.m_ClZzAvoidToggleMod);
 	if(g_Config.m_ClZzFentBotWaypointKey >= KEY_FIRST && g_Config.m_ClZzFentBotWaypointKey < KEY_LAST)
 		GameClient()->m_Binds.Bind(g_Config.m_ClZzFentBotWaypointKey, "+zz_fentbot_waypoint", false, g_Config.m_ClZzFentBotWaypointMod);
 }
@@ -1216,7 +1208,7 @@ int CControls::SnapInput(int *pData)
 		// base input has been assembled. Force a tick-rate packet while either is
 		// enabled; otherwise SnapInput may return 0 before the predictive code gets
 		// a chance to run, which made both features appear inactive while idle.
-		if((g_Config.m_ClZzAvoidEnabled || g_Config.m_ClZzAutoUnfreeze) &&
+		if((g_Config.m_AvoidBlatantEnabled || g_Config.m_ClZzAutoUnfreeze) &&
 			GameClient()->m_Snap.m_pLocalCharacter)
 		{
 			const int TickSpeed = maximum(1, Client()->GameTickSpeed());

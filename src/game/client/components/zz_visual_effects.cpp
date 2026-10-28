@@ -677,11 +677,11 @@ void CZZVisualEffects::UpdateFeatureToasts(float DeltaTime)
 		g_Config.m_ClZzAimbotEnabled, g_Config.m_ClKnHookBlocks,
 		g_Config.m_ClZzHammerAssistEnabled, g_Config.m_ClZzAutoAled,
 		g_Config.m_ClZzFngAutoLaser, g_Config.m_ClZzAutoUnfreeze,
-		g_Config.m_ClZzAvoidEnabled, g_Config.m_ClZzFlyRide,
+		g_Config.m_AvoidBlatantEnabled, g_Config.m_ClZzFlyRide,
 		g_Config.m_ClKnGrenadeSave, g_Config.m_ClKnWatcherList,
 		g_Config.m_ClKnWeaponPrediction, g_Config.m_ClZzBalanceBot};
 	const char *apNames[] = {"Aimbot", "Hook aim", "Hammer assist", "Auto ALED",
-		"FNG auto laser", "Auto unfreeze", "Avoid", "Hook drive",
+		"FNG auto laser", "Auto unfreeze", "Avoid blatant", "Hook drive",
 		"Grenade save", "Observers", "Weapon prediction", "Balance bot"};
 	static_assert(std::size(aCurrent) == FEATURE_WATCH_COUNT);
 	if(!m_FeatureWatchInitialized)

@@ -43,6 +43,7 @@
 #include "components/chat.h"
 #include "components/console.h"
 #include "components/controls.h"
+#include "components/avoidblatant.h"
 #include "components/laserunfreeze.h"
 #include "components/countryflags.h"
 #include "components/damageind.h"
@@ -216,6 +217,7 @@ public:
 	CDebugHud m_DebugHud;
 	CControls m_Controls;
 	CLaserUnfreeze m_LaserUnfreeze;
+	CAvoidBlatant m_AvoidBlatant;
 	CEffects m_Effects;
 	CScoreboard m_Scoreboard;
 	CStatboard m_Statboard;
@@ -357,7 +359,6 @@ private:
 		const vec2 &DummyVel, const vec2 &Goal,
 		int &OutAction);
 	void FentBotTrainUpdate();
-	bool ApplyAvoid(CNetObj_PlayerInput *pInput, int DummyIndex, int LocalId, bool AimOwnedByAction, bool &OverrodeInput);
 	bool ApplyKinetixLaserUnfreeze(CNetObj_PlayerInput *pInput, int DummyIndex,
 		int LocalId);
 	void ResetKinetixLaserUnfreeze();
