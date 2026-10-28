@@ -16,7 +16,9 @@ class CGameWorld;
 // hazard (freeze, death, optionally teleporters, or the void outside of the
 // map) the component searches for the least intrusive replacement input
 // (direction / jump / hook along the cursor) that survives the whole horizon.
-// If the user's input is safe nothing is touched. Everything runs
+// The module reacts only when the hazard is close (a "lead" of a few ticks that
+// grows with ping), so the tee can still get right up to a freeze and squeeze
+// through narrow gaps. If the user's input is safe nothing is touched. Everything runs
 // synchronously on the main thread.
 class CAvoidBlatant : public CComponent
 {
@@ -86,6 +88,8 @@ private:
 
 	// Result and cache of the last decision.
 	bool m_Overriding = false;
+	// Extra safety margin (pixels) added around the tee body; grows with ping.
+	float m_Margin = 0.0f;
 	int m_CachedTick = -1;
 	bool m_CachedOverride = false;
 	CNetObj_PlayerInput m_CachedRaw;
@@ -105,6 +109,8 @@ private:
 	int m_DebugPlanSurvive = 0;
 	int m_DebugCandidates = 0;
 	int m_DebugMicros = 0;
+	int m_DebugPingTicks = 0;
+	int m_DebugLead = 0;
 	int m_DebugHookMode = HOOK_KEEP;
 	int m_VisualTick = -1;
 	vec2 m_aBasePath[MAX_PATH_POINTS];
@@ -119,7 +125,6 @@ private:
 	bool IsHazardTile(int Tile) const;
 	bool HazardAtPoint(vec2 Pos) const;
 	bool HazardAtBody(vec2 Pos) const;
-	bool HazardOnSegment(vec2 From, vec2 To) const;
 	int HazardProximity(vec2 Pos) const;
 
 	bool FindHookHit(vec2 Pos, vec2 Dir) const;

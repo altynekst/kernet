@@ -21,10 +21,11 @@
 namespace
 {
 	constexpr float TILE_SIZE = 32.0f;
-	// The tee body is sampled in the center and at four diagonal offsets, which
-	// is close to how the server checks the tiles around a character.
-	constexpr float BODY_OFFSET = 9.0f;
-	constexpr float SEGMENT_STEP = 6.0f;
+	// The server checks the tile under the center of the tee and under four
+	// corners at PhysicalSize / 3. Using exactly the same points (and only at
+	// the end of every tick, like the server) lets the tee squeeze through a
+	// one tile wide gap instead of being kept far away from every hazard.
+	constexpr float BODY_OFFSET = CCharacterCore::PhysicalSize() / 3.0f;
 
 	const char *StateName(int State)
 	{
@@ -147,24 +148,13 @@ bool CAvoidBlatant::HazardAtPoint(vec2 Pos) const
 
 bool CAvoidBlatant::HazardAtBody(vec2 Pos) const
 {
+	const float Offset = BODY_OFFSET + m_Margin;
 	if(HazardAtPoint(Pos))
 		return true;
-	return HazardAtPoint(Pos + vec2(BODY_OFFSET, BODY_OFFSET)) ||
-	       HazardAtPoint(Pos + vec2(-BODY_OFFSET, BODY_OFFSET)) ||
-	       HazardAtPoint(Pos + vec2(BODY_OFFSET, -BODY_OFFSET)) ||
-	       HazardAtPoint(Pos + vec2(-BODY_OFFSET, -BODY_OFFSET));
-}
-
-bool CAvoidBlatant::HazardOnSegment(vec2 From, vec2 To) const
-{
-	const float Length = distance(From, To);
-	const int Steps = std::max(1, (int)(Length / SEGMENT_STEP));
-	for(int Step = 1; Step <= Steps; ++Step)
-	{
-		if(HazardAtBody(mix(From, To, (float)Step / (float)Steps)))
-			return true;
-	}
-	return false;
+	return HazardAtPoint(Pos + vec2(Offset, Offset)) ||
+	       HazardAtPoint(Pos + vec2(-Offset, Offset)) ||
+	       HazardAtPoint(Pos + vec2(Offset, -Offset)) ||
+	       HazardAtPoint(Pos + vec2(-Offset, -Offset));
 }
 
 int CAvoidBlatant::HazardProximity(vec2 Pos) const
@@ -257,7 +247,7 @@ bool CAvoidBlatant::StepWorld(CGameWorld &World, int LocalId, CNetObj_PlayerInpu
 	*pCur = pChar->GetPos();
 	if(g_Config.m_AvoidBlatantFreeze && (pChar->Core()->m_IsInFreeze || pChar->m_FreezeTime > 0))
 		return false;
-	return !HazardOnSegment(*pPrev, *pCur);
+	return !HazardAtBody(*pCur);
 }
 
 CAvoidBlatant::SOutcome CAvoidBlatant::Simulate(int LocalId, const CNetObj_PlayerInput &First, int FirstTicks,
@@ -350,7 +340,7 @@ void CAvoidBlatant::MakeInput(const CNetObj_PlayerInput &Raw, int Direction, int
 int CAvoidBlatant::BuildCandidates(const CNetObj_PlayerInput &Raw, const SHookAim &Hook, SCandidate *pOut) const
 {
 	int Count = 0;
-	const bool CanJump = (Raw.m_Jump & 1) == 0;
+	const bool CanJump = g_Config.m_AvoidBlatantAutoJump && (Raw.m_Jump & 1) == 0;
 	const int aJumps[2] = {Raw.m_Jump, 1};
 	const int NumJumps = CanJump ? 2 : 1;
 
@@ -399,7 +389,7 @@ bool CAvoidBlatant::GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, c
 	};
 	SAction aActions[12];
 	int NumActions = 0;
-	const bool CanJump = (Raw.m_Jump & 1) == 0;
+	const bool CanJump = g_Config.m_AvoidBlatantAutoJump && (Raw.m_Jump & 1) == 0;
 	const int aJumps[2] = {Raw.m_Jump, 1};
 	const int NumJumps = CanJump ? 2 : 1;
 	for(int Direction = -1; Direction <= 1; ++Direction)
@@ -522,8 +512,23 @@ bool CAvoidBlatant::OnPlayerInput(CNetObj_PlayerInput *pInput, bool HigherPriori
 
 	const int64_t StartTime = time_get();
 	const CNetObj_PlayerInput Raw = *pInput;
-	const int Predict = std::clamp(g_Config.m_AvoidBlatantPredictTicks, 1, 60);
+
+	// Ping compensation. With a high ping the predicted world is less exact, so
+	// the horizon grows a little and the body gets a small safety margin. The
+	// margin stays below 3 px, which still leaves room for a one tile gap.
+	int PingMs = 0;
+	if(const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apPlayerInfos[LocalId])
+		PingMs = std::clamp(pInfo->m_Latency, 0, 400);
+	const int PingTicks = std::clamp(PingMs / 20, 0, 12);
+	m_Margin = std::min(PingTicks * 0.25f, 3.0f);
+
+	const int Predict = std::clamp(g_Config.m_AvoidBlatantPredictTicks + PingTicks / 2, 1, 62);
 	const int Commit = std::clamp(g_Config.m_AvoidBlatantCommitTicks, 1, 20);
+	// The module only steps in when the hazard is this many ticks away or
+	// closer. A short lead lets the tee walk right up to a freeze edge.
+	const int Lead = std::clamp(Predict / 3 + 2 + PingTicks / 3, std::min(3, Predict), Predict);
+	m_DebugPingTicks = PingTicks;
+	m_DebugLead = Lead;
 
 	m_NumBasePath = 0;
 	m_NumPlanPath = 0;
@@ -541,9 +546,9 @@ bool CAvoidBlatant::OnPlayerInput(CNetObj_PlayerInput *pInput, bool HigherPriori
 	int PlanSurvive = Base.m_Survive;
 	int State = STATE_SAFE;
 
-	if(Base.m_Survive > Predict)
+	if(Base.m_Survive > Lead)
 	{
-		// The player is safe on their own: do not interfere.
+		// Nothing dangerous within the lead window: do not interfere.
 		ClearCommit();
 	}
 	else
@@ -728,10 +733,10 @@ void CAvoidBlatant::OnRender()
 
 	if(g_Config.m_AvoidBlatantDebug)
 	{
-		char aBuf[160];
-		str_format(aBuf, sizeof(aBuf), "Avoid: %s | base %d | plan %d | cand %d | %s | %d us",
-			StateName(m_State), m_DebugBaseSurvive, m_DebugPlanSurvive, m_DebugCandidates,
-			HookName(m_DebugHookMode), m_DebugMicros);
+		char aBuf[200];
+		str_format(aBuf, sizeof(aBuf), "Avoid: %s | base %d | plan %d | lead %d | ping %d | cand %d | %s | %d us",
+			StateName(m_State), m_DebugBaseSurvive, m_DebugPlanSurvive, m_DebugLead,
+			m_DebugPingTicks, m_DebugCandidates, HookName(m_DebugHookMode), m_DebugMicros);
 		const vec2 Origin = m_aBasePath[0];
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
 		TextRender()->Text(Origin.x - 90.0f, Origin.y - 80.0f, 14.0f, aBuf);

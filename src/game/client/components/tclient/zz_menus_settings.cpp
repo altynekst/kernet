@@ -249,7 +249,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		// Left: Avoid blatant + Hammer-gun
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Left, 270.0f, Localize("Avoid blatant"), Inner);
+			DoFeaturePanel(Left, 240.0f, Localize("Avoid blatant"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantEnabled, Localize("Включить авойд"),
 				&g_Config.m_AvoidBlatantEnabled, &Inner, LineSize);
@@ -265,6 +265,9 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantHookAssist, Localize("Помощь хуком (только по прицелу)"),
 				&g_Config.m_AvoidBlatantHookAssist, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_AvoidBlatantAutoJump, Localize("Авто-прыжок"),
+				&g_Config.m_AvoidBlatantAutoJump, &Inner, LineSize);
 			Inner.HSplitTop(LineSize, &Button, &Inner);
 			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantPredictTicks,
 				&g_Config.m_AvoidBlatantPredictTicks, &Button,
@@ -279,11 +282,6 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantDebug, Localize("Отладочная строка"),
 				&g_Config.m_AvoidBlatantDebug, &Inner, LineSize);
-			Inner.HSplitTop(5.0f, nullptr, &Inner);
-			Inner.HSplitTop(LineSize, &Label, &Inner);
-			Ui()->DoLabel(&Label,
-				Localize("Уступает Laser unfreeze и Auto ALED."), 14.0f,
-				TEXTALIGN_ML);
 		}
 		{
 			CUIRect Inner;

@@ -865,6 +865,7 @@ MACRO_CONFIG_INT(AvoidBlatantFreeze, avoid_blatant_freeze, 1, 0, 1, CFGFLAG_CLIE
 MACRO_CONFIG_INT(AvoidBlatantDeath, avoid_blatant_death, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: avoid death tiles")
 MACRO_CONFIG_INT(AvoidBlatantTele, avoid_blatant_tele, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: avoid teleporters")
 MACRO_CONFIG_INT(AvoidBlatantHookAssist, avoid_blatant_hook_assist, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: hook assist")
+MACRO_CONFIG_INT(AvoidBlatantAutoJump, avoid_blatant_auto_jump, 1, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: auto jump")
 MACRO_CONFIG_INT(AvoidBlatantPredictTicks, avoid_blatant_predict_ticks, 10, 1, 60, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: predict ticks")
 MACRO_CONFIG_INT(AvoidBlatantCommitTicks, avoid_blatant_commit_ticks, 4, 1, 20, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: commit ticks")
 MACRO_CONFIG_INT(AvoidBlatantVisualPath, avoid_blatant_visual_path, 0, 0, 1, CFGFLAG_CLIENT|CFGFLAG_SAVE, "Avoid Blatant: show predicted path")
