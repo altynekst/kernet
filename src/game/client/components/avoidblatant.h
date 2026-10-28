@@ -16,9 +16,10 @@ class CGameWorld;
 // hazard (freeze, death, optionally teleporters, or the void outside of the
 // map) the component searches for the least intrusive replacement input
 // (direction / jump / hook along the cursor) that survives the whole horizon.
-// The module reacts only when the hazard is close (a "lead" of a few ticks that
-// grows with ping), so the tee can still get right up to a freeze and squeeze
-// through narrow gaps. If the user's input is safe nothing is touched. Everything runs
+// The key idea is a viability check: the user's input is allowed as long as
+// the tee is still guaranteed to have an escape plan *after* this tick. So the
+// tee may walk right up to a freeze edge or squeeze through a one tile gap, but
+// the last step that would leave no way out is never taken. Everything runs
 // synchronously on the main thread.
 class CAvoidBlatant : public CComponent
 {
@@ -59,6 +60,7 @@ private:
 		STATE_BEST_PLAN,
 		STATE_GREEDY,
 		STATE_NO_SOLUTION,
+		STATE_VIABLE,
 	};
 
 	struct SOutcome
@@ -110,7 +112,7 @@ private:
 	int m_DebugCandidates = 0;
 	int m_DebugMicros = 0;
 	int m_DebugPingTicks = 0;
-	int m_DebugLead = 0;
+	int m_DebugHorizon = 0;
 	int m_DebugHookMode = HOOK_KEEP;
 	int m_VisualTick = -1;
 	vec2 m_aBasePath[MAX_PATH_POINTS];
@@ -137,8 +139,13 @@ private:
 	void MakeInput(const CNetObj_PlayerInput &Raw, int Direction, int Jump, int HookMode,
 		const SHookAim &Hook, CNetObj_PlayerInput *pOut) const;
 	int BuildCandidates(const CNetObj_PlayerInput &Raw, const SHookAim &Hook, SCandidate *pOut) const;
-	bool GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, const SHookAim &Hook, int Horizon,
-		int64_t Deadline, CNetObj_PlayerInput *pFirst, int *pFirstHookMode) const;
+	bool GreedyRollout(CGameWorld &Rolling, int LocalId, const CNetObj_PlayerInput &Raw, const SHookAim &Hook,
+		int Horizon, int64_t Deadline, CNetObj_PlayerInput *pFirst, int *pFirstHookMode) const;
+	bool PolicySurvives(CGameWorld &Start, int LocalId, const CNetObj_PlayerInput &Policy, int HookMode,
+		int Ticks, int Commit) const;
+	bool RawIsViable(int LocalId, const CNetObj_PlayerInput &Raw, const SHookAim &Hook,
+		const SCandidate *pPolicies, int NumPolicies, int Horizon, int Commit, int64_t Deadline) const;
+	int ComputeHorizon(int LocalId, int PingTicks) const;
 
 	void ApplyPlan(CNetObj_PlayerInput *pInput, const CNetObj_PlayerInput &Plan) const;
 };

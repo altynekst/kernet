@@ -39,6 +39,7 @@ namespace
 		case 6: return "plan";
 		case 7: return "greedy";
 		case 8: return "no solution";
+		case 9: return "viable";
 		default: return "idle";
 		}
 	}
@@ -378,8 +379,8 @@ int CAvoidBlatant::BuildCandidates(const CNetObj_PlayerInput &Raw, const SHookAi
 	return Count;
 }
 
-bool CAvoidBlatant::GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, const SHookAim &Hook,
-	int Horizon, int64_t Deadline, CNetObj_PlayerInput *pFirst, int *pFirstHookMode) const
+bool CAvoidBlatant::GreedyRollout(CGameWorld &Rolling, int LocalId, const CNetObj_PlayerInput &Raw,
+	const SHookAim &Hook, int Horizon, int64_t Deadline, CNetObj_PlayerInput *pFirst, int *pFirstHookMode) const
 {
 	struct SAction
 	{
@@ -399,10 +400,6 @@ bool CAvoidBlatant::GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, c
 		if(!Raw.m_Hook && Hook.m_AimOk)
 			aActions[NumActions++] = {Direction, Raw.m_Jump, HOOK_AIM};
 	}
-
-	CGameWorld Rolling;
-	Rolling.CopyWorldClean(&GameClient()->m_RegularPredictedWorld);
-	Rolling.m_WorldConfig.m_PredictFreeze = 1;
 
 	for(int Tick = 1; Tick <= Horizon; ++Tick)
 	{
@@ -454,6 +451,99 @@ bool CAvoidBlatant::GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, c
 		}
 	}
 	return true;
+}
+
+bool CAvoidBlatant::PolicySurvives(CGameWorld &Start, int LocalId, const CNetObj_PlayerInput &Policy,
+	int HookMode, int Ticks, int Commit) const
+{
+	CGameWorld Branch;
+	Branch.CopyWorldClean(&Start);
+	Branch.m_WorldConfig.m_PredictFreeze = 1;
+	CNetObj_PlayerInput Follow = Policy;
+	int FirstTicks = Ticks;
+	if(HookMode == HOOK_AIM || HookMode == HOOK_MIRROR)
+	{
+		// A hook assist holds the hook only for the commit window.
+		Follow.m_Hook = 0;
+		FirstTicks = Commit;
+	}
+	for(int Tick = 1; Tick <= Ticks; ++Tick)
+	{
+		vec2 Prev;
+		vec2 Cur;
+		if(!StepWorld(Branch, LocalId, Tick <= FirstTicks ? Policy : Follow, &Prev, &Cur))
+			return false;
+	}
+	return true;
+}
+
+// Viability check. The raw input is applied for exactly one tick. The resulting
+// state is "viable" if at least one escape plan keeps the tee safe for the rest
+// of the horizon. Plans are tried gentlest first; the first one that works ends
+// the search, so in open space this costs a single short simulation.
+bool CAvoidBlatant::RawIsViable(int LocalId, const CNetObj_PlayerInput &Raw, const SHookAim &Hook,
+	const SCandidate *pPolicies, int NumPolicies, int Horizon, int Commit, int64_t Deadline) const
+{
+	CGameWorld Next;
+	Next.CopyWorldClean(&GameClient()->m_RegularPredictedWorld);
+	Next.m_WorldConfig.m_PredictFreeze = 1;
+	vec2 Prev;
+	vec2 Cur;
+	if(!StepWorld(Next, LocalId, Raw, &Prev, &Cur))
+		return false; // the raw input itself walks into danger on this very tick
+	const int Remaining = Horizon - 1;
+	if(Remaining <= 0)
+		return true;
+
+	// Escape order: stopping first, then steering, then jumping, hooking last.
+	int aOrder[MAX_CANDIDATES];
+	int aKey[MAX_CANDIDATES];
+	const int Count = std::min(NumPolicies, (int)MAX_CANDIDATES);
+	for(int Index = 0; Index < Count; ++Index)
+	{
+		const SCandidate &Policy = pPolicies[Index];
+		int Key = 0;
+		if(Policy.m_Input.m_Direction != 0)
+			Key += 2;
+		if((Policy.m_Input.m_Jump & 1) != (Raw.m_Jump & 1))
+			Key += 3;
+		if(Policy.m_HookMode == HOOK_AIM || Policy.m_HookMode == HOOK_MIRROR)
+			Key += 6;
+		aOrder[Index] = Index;
+		aKey[Index] = Key;
+	}
+	std::stable_sort(aOrder, aOrder + Count, [&](int A, int B) { return aKey[A] < aKey[B]; });
+
+	for(int Rank = 0; Rank < Count; ++Rank)
+	{
+		if(time_get() > Deadline)
+			return false;
+		const SCandidate &Policy = pPolicies[aOrder[Rank]];
+		if(PolicySurvives(Next, LocalId, Policy.m_Input, Policy.m_HookMode, Remaining, Commit))
+			return true;
+	}
+
+	// Second tier: a greedy rollout can find plans that change action mid-way.
+	if(time_get() < Deadline)
+	{
+		CGameWorld Rolling;
+		Rolling.CopyWorldClean(&Next);
+		Rolling.m_WorldConfig.m_PredictFreeze = 1;
+		CNetObj_PlayerInput First = Raw;
+		int FirstHookMode = HOOK_KEEP;
+		return GreedyRollout(Rolling, LocalId, Raw, Hook, std::min(Remaining, 12), Deadline, &First, &FirstHookMode);
+	}
+	return false;
+}
+
+// The horizon grows with ping (the predicted world is less exact) and with the
+// speed of the tee (a fast tee needs more ticks to stop or to reach a ceiling).
+int CAvoidBlatant::ComputeHorizon(int LocalId, int PingTicks) const
+{
+	int SpeedBonus = 0;
+	if(CCharacter *pChar = GameClient()->m_RegularPredictedWorld.GetCharacterById(LocalId))
+		SpeedBonus = std::clamp((int)(length(pChar->Core()->m_Vel) * 0.8f), 0, 24);
+	return std::clamp(g_Config.m_AvoidBlatantPredictTicks + PingTicks / 2 + SpeedBonus, 1, 62);
 }
 
 void CAvoidBlatant::ApplyPlan(CNetObj_PlayerInput *pInput, const CNetObj_PlayerInput &Plan) const
@@ -511,29 +601,29 @@ bool CAvoidBlatant::OnPlayerInput(CNetObj_PlayerInput *pInput, bool HigherPriori
 	}
 
 	const int64_t StartTime = time_get();
+	// Time budgets: the viability search may use 5 ms, the whole decision 12 ms.
+	const int64_t ViabilityDeadline = StartTime + time_freq() * 5 / 1000;
+	const int64_t HardDeadline = StartTime + time_freq() * 12 / 1000;
 	const CNetObj_PlayerInput Raw = *pInput;
 
 	// Ping compensation. With a high ping the predicted world is less exact, so
-	// the horizon grows a little and the body gets a small safety margin. The
-	// margin stays below 3 px, which still leaves room for a one tile gap.
+	// the body gets a small safety margin (below 3 px, so a one tile gap still
+	// fits) and the horizon is a little longer.
 	int PingMs = 0;
 	if(const CNetObj_PlayerInfo *pInfo = GameClient()->m_Snap.m_apPlayerInfos[LocalId])
 		PingMs = std::clamp(pInfo->m_Latency, 0, 400);
 	const int PingTicks = std::clamp(PingMs / 20, 0, 12);
 	m_Margin = std::min(PingTicks * 0.25f, 3.0f);
 
-	const int Predict = std::clamp(g_Config.m_AvoidBlatantPredictTicks + PingTicks / 2, 1, 62);
+	const int Horizon = ComputeHorizon(LocalId, PingTicks);
 	const int Commit = std::clamp(g_Config.m_AvoidBlatantCommitTicks, 1, 20);
-	// The module only steps in when the hazard is this many ticks away or
-	// closer. A short lead lets the tee walk right up to a freeze edge.
-	const int Lead = std::clamp(Predict / 3 + 2 + PingTicks / 3, std::min(3, Predict), Predict);
 	m_DebugPingTicks = PingTicks;
-	m_DebugLead = Lead;
+	m_DebugHorizon = Horizon;
 
 	m_NumBasePath = 0;
 	m_NumPlanPath = 0;
-	const SOutcome Base = Simulate(LocalId, Raw, Predict, Raw, Predict, m_aBasePath, &m_NumBasePath);
-	m_BaseHazardIndex = Base.m_Survive <= Predict ? Base.m_Survive : -1;
+	const SOutcome Base = Simulate(LocalId, Raw, Horizon, Raw, Horizon, m_aBasePath, &m_NumBasePath);
+	m_BaseHazardIndex = Base.m_Survive <= Horizon ? Base.m_Survive : -1;
 	m_VisualTick = Tick;
 	m_DebugBaseSurvive = Base.m_Survive;
 	m_DebugPlanSurvive = Base.m_Survive;
@@ -546,9 +636,9 @@ bool CAvoidBlatant::OnPlayerInput(CNetObj_PlayerInput *pInput, bool HigherPriori
 	int PlanSurvive = Base.m_Survive;
 	int State = STATE_SAFE;
 
-	if(Base.m_Survive > Lead)
+	if(Base.m_Survive > Horizon)
 	{
-		// Nothing dangerous within the lead window: do not interfere.
+		// Holding the raw input is safe for the whole horizon: do not interfere.
 		ClearCommit();
 	}
 	else
@@ -556,115 +646,144 @@ bool CAvoidBlatant::OnPlayerInput(CNetObj_PlayerInput *pInput, bool HigherPriori
 		const SHookAim Hook = EvaluateHookAim(Raw, LocalId);
 		SCandidate aCandidates[MAX_CANDIDATES + 1];
 		int NumCandidates = BuildCandidates(Raw, Hook, aCandidates);
+		const int NumPolicies = NumCandidates;
 
-		// The plan chosen on the previous tick competes with a small bonus so
-		// the decision does not flip between equal alternatives.
-		bool CommitIndexValid = false;
-		int CommitIndex = -1;
-		if(m_HasCommit && Tick <= m_CommitUntil && NumCandidates < MAX_CANDIDATES + 1)
+		// 1. Viability: the raw input may be used if, after this tick, an escape
+		// plan still exists. This is what lets the tee get right up to a freeze
+		// without ever taking the step that has no way out.
+		if(RawIsViable(LocalId, Raw, Hook, aCandidates, NumPolicies, Horizon, Commit, ViabilityDeadline))
 		{
-			const bool NeedsAim = m_CommitHookMode == HOOK_AIM;
-			const bool NeedsMirror = m_CommitHookMode == HOOK_MIRROR;
-			if((!NeedsAim || Hook.m_AimOk) && (!NeedsMirror || Hook.m_MirrorOk))
-			{
-				SCandidate &Candidate = aCandidates[NumCandidates];
-				MakeInput(Raw, m_CommitDirection, m_CommitJump, m_CommitHookMode, Hook, &Candidate.m_Input);
-				Candidate.m_HookMode = m_CommitHookMode;
-				Candidate.m_Cost = CandidateCost(Raw, Candidate.m_Input, m_CommitHookMode) - 1;
-				CommitIndex = NumCandidates;
-				CommitIndexValid = true;
-				++NumCandidates;
-			}
-		}
-		m_DebugCandidates = NumCandidates;
-
-		int BestIndex = -1;
-		for(int Index = 0; Index < NumCandidates; ++Index)
-		{
-			SCandidate &Candidate = aCandidates[Index];
-			CNetObj_PlayerInput Follow = Candidate.m_Input;
-			int FirstTicks = Predict;
-			if(Candidate.m_HookMode == HOOK_AIM || Candidate.m_HookMode == HOOK_MIRROR)
-			{
-				// A hook assist holds the hook only for the commit window.
-				Follow.m_Hook = 0;
-				FirstTicks = Commit;
-			}
-			Candidate.m_Outcome = Simulate(LocalId, Candidate.m_Input, FirstTicks, Follow, Predict, nullptr, nullptr);
-			if(BestIndex < 0 ||
-				Candidate.m_Outcome.m_Survive > aCandidates[BestIndex].m_Outcome.m_Survive ||
-				(Candidate.m_Outcome.m_Survive == aCandidates[BestIndex].m_Outcome.m_Survive &&
-					Candidate.m_Cost < aCandidates[BestIndex].m_Cost))
-				BestIndex = Index;
-		}
-
-		if(BestIndex >= 0 && aCandidates[BestIndex].m_Outcome.m_Survive > Predict)
-		{
-			Override = true;
-			Plan = aCandidates[BestIndex].m_Input;
-			PlanHookMode = aCandidates[BestIndex].m_HookMode;
-			PlanSurvive = aCandidates[BestIndex].m_Outcome.m_Survive;
-			State = (CommitIndexValid && BestIndex == CommitIndex) ? STATE_COMMIT : STATE_BEST_PLAN;
+			State = STATE_VIABLE;
+			ClearCommit();
 		}
 		else
 		{
-			// Nothing saves the tee outright: greedy rollout, which picks the
-			// best single action on every tick of the horizon.
-			bool GreedyOk = false;
-			if(Tick >= m_GreedyCooldownUntil)
+			// 2. The raw input leads into a dead end: pick the gentlest action
+			// that keeps an escape. The plan chosen on the previous tick gets a
+			// small bonus so the decision does not flip between equal options.
+			bool CommitIndexValid = false;
+			int CommitIndex = -1;
+			if(m_HasCommit && Tick <= m_CommitUntil && NumCandidates < MAX_CANDIDATES + 1)
 			{
-				const int64_t Deadline = time_get() + time_freq() * 3 / 1000;
-				CNetObj_PlayerInput First = Raw;
-				int FirstHookMode = HOOK_KEEP;
-				GreedyOk = GreedyRollout(LocalId, Raw, Hook, std::min(Predict, 12), Deadline, &First, &FirstHookMode);
-				if(GreedyOk)
+				const bool NeedsAim = m_CommitHookMode == HOOK_AIM;
+				const bool NeedsMirror = m_CommitHookMode == HOOK_MIRROR;
+				if((!NeedsAim || Hook.m_AimOk) && (!NeedsMirror || Hook.m_MirrorOk))
 				{
-					Override = true;
-					Plan = First;
-					PlanHookMode = FirstHookMode;
-					PlanSurvive = Predict + 1;
-					State = STATE_GREEDY;
+					SCandidate &Candidate = aCandidates[NumCandidates];
+					MakeInput(Raw, m_CommitDirection, m_CommitJump, m_CommitHookMode, Hook, &Candidate.m_Input);
+					Candidate.m_HookMode = m_CommitHookMode;
+					Candidate.m_Cost = CandidateCost(Raw, Candidate.m_Input, m_CommitHookMode) - 1;
+					CommitIndex = NumCandidates;
+					CommitIndexValid = true;
+					++NumCandidates;
 				}
-				else
-					m_GreedyCooldownUntil = Tick + 5;
 			}
-			if(!GreedyOk)
-			{
-				// Still take a plan that at least delays the hazard.
-				if(BestIndex >= 0 && aCandidates[BestIndex].m_Outcome.m_Survive > Base.m_Survive)
-				{
-					Override = true;
-					Plan = aCandidates[BestIndex].m_Input;
-					PlanHookMode = aCandidates[BestIndex].m_HookMode;
-					PlanSurvive = aCandidates[BestIndex].m_Outcome.m_Survive;
-					State = STATE_BEST_PLAN;
-				}
-				else
-					State = STATE_NO_SOLUTION;
-			}
-		}
+			// Evaluate the least intrusive candidates first.
+			int aOrder[MAX_CANDIDATES + 1];
+			for(int Index = 0; Index < NumCandidates; ++Index)
+				aOrder[Index] = Index;
+			std::stable_sort(aOrder, aOrder + NumCandidates, [&](int A, int B) {
+				return aCandidates[A].m_Cost < aCandidates[B].m_Cost;
+			});
+			m_DebugCandidates = NumCandidates;
 
-		if(Override)
-		{
-			m_HasCommit = true;
-			m_CommitUntil = Tick + Commit;
-			m_CommitDirection = Plan.m_Direction;
-			m_CommitJump = Plan.m_Jump;
-			m_CommitHookMode = PlanHookMode;
-			if(g_Config.m_AvoidBlatantVisualPath)
+			int BestIndex = -1;
+			for(int Rank = 0; Rank < NumCandidates; ++Rank)
 			{
-				CNetObj_PlayerInput Follow = Plan;
-				int FirstTicks = Predict;
-				if(PlanHookMode == HOOK_AIM || PlanHookMode == HOOK_MIRROR)
+				const int Index = aOrder[Rank];
+				SCandidate &Candidate = aCandidates[Index];
+				CNetObj_PlayerInput Follow = Candidate.m_Input;
+				int FirstTicks = Horizon;
+				if(Candidate.m_HookMode == HOOK_AIM || Candidate.m_HookMode == HOOK_MIRROR)
 				{
 					Follow.m_Hook = 0;
 					FirstTicks = Commit;
 				}
-				Simulate(LocalId, Plan, FirstTicks, Follow, Predict, m_aPlanPath, &m_NumPlanPath);
+				Candidate.m_Outcome = Simulate(LocalId, Candidate.m_Input, FirstTicks, Follow, Horizon, nullptr, nullptr);
+				if(BestIndex < 0 ||
+					Candidate.m_Outcome.m_Survive > aCandidates[BestIndex].m_Outcome.m_Survive ||
+					(Candidate.m_Outcome.m_Survive == aCandidates[BestIndex].m_Outcome.m_Survive &&
+						Candidate.m_Cost < aCandidates[BestIndex].m_Cost))
+					BestIndex = Index;
+				// The first fully safe candidate in cost order is the answer.
+				if(Candidate.m_Outcome.m_Survive > Horizon && Index == BestIndex)
+					break;
+				if(time_get() > HardDeadline)
+					break;
 			}
+
+			if(BestIndex >= 0 && aCandidates[BestIndex].m_Outcome.m_Survive > Horizon)
+			{
+				Override = true;
+				Plan = aCandidates[BestIndex].m_Input;
+				PlanHookMode = aCandidates[BestIndex].m_HookMode;
+				PlanSurvive = aCandidates[BestIndex].m_Outcome.m_Survive;
+				State = (CommitIndexValid && BestIndex == CommitIndex) ? STATE_COMMIT : STATE_BEST_PLAN;
+			}
+			else
+			{
+				// 3. Nothing saves the tee outright: greedy rollout, which picks
+				// the best single action on every tick of the horizon.
+				bool GreedyOk = false;
+				if(Tick >= m_GreedyCooldownUntil)
+				{
+					const int64_t GreedyDeadline = time_get() + time_freq() * 3 / 1000;
+					CGameWorld Rolling;
+					Rolling.CopyWorldClean(&GameClient()->m_RegularPredictedWorld);
+					Rolling.m_WorldConfig.m_PredictFreeze = 1;
+					CNetObj_PlayerInput First = Raw;
+					int FirstHookMode = HOOK_KEEP;
+					GreedyOk = GreedyRollout(Rolling, LocalId, Raw, Hook, std::min(Horizon, 12),
+						GreedyDeadline, &First, &FirstHookMode);
+					if(GreedyOk)
+					{
+						Override = true;
+						Plan = First;
+						PlanHookMode = FirstHookMode;
+						PlanSurvive = Horizon + 1;
+						State = STATE_GREEDY;
+					}
+					else
+						m_GreedyCooldownUntil = Tick + 3;
+				}
+				if(!GreedyOk)
+				{
+					// Still take a plan that at least delays the hazard.
+					if(BestIndex >= 0 && aCandidates[BestIndex].m_Outcome.m_Survive > Base.m_Survive)
+					{
+						Override = true;
+						Plan = aCandidates[BestIndex].m_Input;
+						PlanHookMode = aCandidates[BestIndex].m_HookMode;
+						PlanSurvive = aCandidates[BestIndex].m_Outcome.m_Survive;
+						State = STATE_BEST_PLAN;
+					}
+					else
+						State = STATE_NO_SOLUTION;
+				}
+			}
+
+			if(Override)
+			{
+				m_HasCommit = true;
+				m_CommitUntil = Tick + Commit;
+				m_CommitDirection = Plan.m_Direction;
+				m_CommitJump = Plan.m_Jump;
+				m_CommitHookMode = PlanHookMode;
+				if(g_Config.m_AvoidBlatantVisualPath)
+				{
+					CNetObj_PlayerInput Follow = Plan;
+					int FirstTicks = Horizon;
+					if(PlanHookMode == HOOK_AIM || PlanHookMode == HOOK_MIRROR)
+					{
+						Follow.m_Hook = 0;
+						FirstTicks = Commit;
+					}
+					Simulate(LocalId, Plan, FirstTicks, Follow, Horizon, m_aPlanPath, &m_NumPlanPath);
+				}
+			}
+			else
+				ClearCommit();
 		}
-		else
-			ClearCommit();
 	}
 
 	m_State = State;
@@ -734,8 +853,8 @@ void CAvoidBlatant::OnRender()
 	if(g_Config.m_AvoidBlatantDebug)
 	{
 		char aBuf[200];
-		str_format(aBuf, sizeof(aBuf), "Avoid: %s | base %d | plan %d | lead %d | ping %d | cand %d | %s | %d us",
-			StateName(m_State), m_DebugBaseSurvive, m_DebugPlanSurvive, m_DebugLead,
+		str_format(aBuf, sizeof(aBuf), "Avoid: %s | base %d | plan %d | horizon %d | ping %d | cand %d | %s | %d us",
+			StateName(m_State), m_DebugBaseSurvive, m_DebugPlanSurvive, m_DebugHorizon,
 			m_DebugPingTicks, m_DebugCandidates, HookName(m_DebugHookMode), m_DebugMicros);
 		const vec2 Origin = m_aBasePath[0];
 		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 0.95f);
