@@ -249,7 +249,7 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		// Left: Avoid blatant + Hammer-gun
 		{
 			CUIRect Inner;
-			DoFeaturePanel(Left, 240.0f, Localize("Avoid blatant"), Inner);
+			DoFeaturePanel(Left, 305.0f, Localize("Avoid blatant"), Inner);
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantEnabled, Localize("Включить авойд"),
 				&g_Config.m_AvoidBlatantEnabled, &Inner, LineSize);
@@ -268,6 +268,12 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantAutoJump, Localize("Авто-прыжок"),
 				&g_Config.m_AvoidBlatantAutoJump, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_AvoidBlatantHookFree, Localize("Хук-спасение в любую сторону"),
+				&g_Config.m_AvoidBlatantHookFree, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_AvoidBlatantNarrowPass, Localize("Проход в узких местах"),
+				&g_Config.m_AvoidBlatantNarrowPass, &Inner, LineSize);
 			Inner.HSplitTop(LineSize, &Button, &Inner);
 			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantPredictTicks,
 				&g_Config.m_AvoidBlatantPredictTicks, &Button,
@@ -276,6 +282,10 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantCommitTicks,
 				&g_Config.m_AvoidBlatantCommitTicks, &Button,
 				Localize("Удержание плана (тиков)"), 1, 20);
+			Inner.HSplitTop(LineSize, &Button, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantSafeDistance,
+				&g_Config.m_AvoidBlatantSafeDistance, &Button,
+				Localize("Дистанция безопасности (px)"), 0, 48);
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantVisualPath, Localize("Показывать путь"),
 				&g_Config.m_AvoidBlatantVisualPath, &Inner, LineSize);
