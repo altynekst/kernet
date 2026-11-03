@@ -350,21 +350,19 @@ void CAvoidBlatant::MakeInput(const CNetObj_PlayerInput &Raw, int Direction, int
 int CAvoidBlatant::BuildCandidates(const CNetObj_PlayerInput &Raw, const SHookAim &Hook, SCandidate *pOut) const
 {
 	int Count = 0;
-	// Pressing a new jump needs the auto jump option; releasing a held jump is
-	// always allowed (otherwise a jump into a freeze could not be cancelled).
-	const bool CanChangeJump = (Raw.m_Jump & 1) != 0 || g_Config.m_AvoidBlatantAutoJump;
-	const int aJumps[2] = {Raw.m_Jump, (Raw.m_Jump & 1) ? 0 : 1};
-	const int NumJumps = CanChangeJump ? 2 : 1;
+	const bool CanJump = (Raw.m_Jump & 1) == 0;
+	const int aJumps[2] = {Raw.m_Jump, 1};
+	const int NumJumps = CanJump ? 2 : 1;
 
-	// The hook assist only works while the user holds the hook button: it may
-	// release that hook, or point it to the opposite side when the cursor points
-	// into danger. It never starts a hook by itself.
 	int aHookModes[3];
 	int NumHookModes = 0;
 	aHookModes[NumHookModes++] = HOOK_KEEP;
 	if(Raw.m_Hook)
-	{
 		aHookModes[NumHookModes++] = HOOK_RELEASE;
+	else
+	{
+		if(Hook.m_AimOk)
+			aHookModes[NumHookModes++] = HOOK_AIM;
 		if(Hook.m_MirrorOk)
 			aHookModes[NumHookModes++] = HOOK_MIRROR;
 	}
@@ -401,13 +399,15 @@ bool CAvoidBlatant::GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, c
 	};
 	SAction aActions[12];
 	int NumActions = 0;
-	const bool CanChangeJump = (Raw.m_Jump & 1) != 0 || g_Config.m_AvoidBlatantAutoJump;
-	const int aJumps[2] = {Raw.m_Jump, (Raw.m_Jump & 1) ? 0 : 1};
-	const int NumJumps = CanChangeJump ? 2 : 1;
+	const bool CanJump = (Raw.m_Jump & 1) == 0;
+	const int aJumps[2] = {Raw.m_Jump, 1};
+	const int NumJumps = CanJump ? 2 : 1;
 	for(int Direction = -1; Direction <= 1; ++Direction)
 	{
 		for(int JumpIndex = 0; JumpIndex < NumJumps; ++JumpIndex)
 			aActions[NumActions++] = {Direction, aJumps[JumpIndex], HOOK_KEEP};
+		if(!Raw.m_Hook && Hook.m_AimOk)
+			aActions[NumActions++] = {Direction, Raw.m_Jump, HOOK_AIM};
 	}
 
 	CGameWorld Rolling;
@@ -560,10 +560,7 @@ bool CAvoidBlatant::OnPlayerInput(CNetObj_PlayerInput *pInput, bool HigherPriori
 		{
 			const bool NeedsAim = m_CommitHookMode == HOOK_AIM;
 			const bool NeedsMirror = m_CommitHookMode == HOOK_MIRROR;
-			// A remembered hook plan is only reused while the user still holds the
-			// hook button, so the hook can never restart by itself.
-			const bool HookAllowed = (!NeedsAim && !NeedsMirror) || Raw.m_Hook;
-			if(HookAllowed && (!NeedsAim || Hook.m_AimOk) && (!NeedsMirror || Hook.m_MirrorOk))
+			if((!NeedsAim || Hook.m_AimOk) && (!NeedsMirror || Hook.m_MirrorOk))
 			{
 				SCandidate &Candidate = aCandidates[NumCandidates];
 				MakeInput(Raw, m_CommitDirection, m_CommitJump, m_CommitHookMode, Hook, &Candidate.m_Input);
