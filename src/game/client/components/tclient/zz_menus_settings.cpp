@@ -384,6 +384,58 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 		CUIRect LeftView, RightView;
 		MainView.VSplitMid(&LeftView, &RightView, 20.0f);
 
+		// Zz: Spoofer (Aether style)
+		{
+			CUIRect Inner;
+			DoFeaturePanel(LeftView, 180.0f, Localize("Spoofer"), Inner);
+			const float LineSize = 20.0f;
+
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_ZzSpoofClientStr, Localize("Enable Spoofer"),
+				&g_Config.m_ZzSpoofClientStr, &Inner, LineSize);
+
+			{
+				CUIRect RowLabel, RowDropDown;
+				Inner.HSplitTop(LineSize, &RowLabel, &Inner);
+				Ui()->DoLabel(&RowLabel, Localize("Client preset"), 14.0f, TEXTALIGN_ML);
+				std::array<const char *, 4> aZzPresetNames = {"DDNet", "TClient", "BestClient", "Custom"};
+				static CUi::SDropDownState s_ZzSpoofPresetDropDownState;
+				static CScrollRegion s_ZzSpoofPresetDropDownScrollRegion;
+				s_ZzSpoofPresetDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_ZzSpoofPresetDropDownScrollRegion;
+				const int OldVal = std::clamp(g_Config.m_ZzSpoofClientPreset, 0, 3);
+				Inner.HSplitTop(LineSize, &RowDropDown, &Inner);
+				const int NewVal = Ui()->DoDropDown(&RowDropDown, OldVal, aZzPresetNames.data(), aZzPresetNames.size(), s_ZzSpoofPresetDropDownState);
+				if(NewVal != OldVal) {
+					g_Config.m_ZzSpoofClientPreset = NewVal;
+					if(NewVal == 0) {
+						str_copy(g_Config.m_ZzSpoofClientName, "DDNet", sizeof(g_Config.m_ZzSpoofClientName));
+						str_copy(g_Config.m_ZzSpoofClientVersion, "19.8.2", sizeof(g_Config.m_ZzSpoofClientVersion));
+						g_Config.m_ZzSpoofVersionId = 19082;
+					} else if(NewVal == 1) {
+						str_copy(g_Config.m_ZzSpoofClientName, "TClient", sizeof(g_Config.m_ZzSpoofClientName));
+						str_copy(g_Config.m_ZzSpoofClientVersion, "10.9.0", sizeof(g_Config.m_ZzSpoofClientVersion));
+						g_Config.m_ZzSpoofVersionId = 20010;
+						str_copy(g_Config.m_ZzSpoofGitHash, "2e2aedc2e7b463a10b324a0f69d3fdb57", sizeof(g_Config.m_ZzSpoofGitHash));
+						g_Config.m_ZzSpoofGitHashEnabled = 1;
+					} else if(NewVal == 2) {
+						str_copy(g_Config.m_ZzSpoofClientName, "BestClient", sizeof(g_Config.m_ZzSpoofClientName));
+						str_copy(g_Config.m_ZzSpoofClientVersion, "2.1.1 stable-beta", sizeof(g_Config.m_ZzSpoofClientVersion));
+						g_Config.m_ZzSpoofVersionId = 19080;
+						str_copy(g_Config.m_ZzSpoofGitHash, "0df5194057d68a7708b282c5c8245308", sizeof(g_Config.m_ZzSpoofGitHash));
+						g_Config.m_ZzSpoofGitHashEnabled = 1;
+					}
+				}
+			}
+
+			CUIRect ZzButton;
+			Inner.HSplitTop(LineSize, &ZzButton, &Inner);
+			Ui()->DoScrollbarOption(&g_Config.m_ZzSpoofVersionId,
+				&g_Config.m_ZzSpoofVersionId, &ZzButton, Localize("Version ID"), 10000, 21000);
+
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_ZzSpoofGitHashEnabled, Localize("Spoof Git hash"),
+				&g_Config.m_ZzSpoofGitHashEnabled, &Inner, LineSize);
+		}
         // Zz: Восстановленные блоки
         {
                 CUIRect Inner, LuLabel, LuRow;
