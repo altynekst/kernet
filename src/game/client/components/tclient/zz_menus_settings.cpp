@@ -265,6 +265,9 @@ void CMenus::RenderSettingsKernelNet(CUIRect MainView)
 			DoButton_CheckBoxAutoVMarginAndSet(
 				&g_Config.m_AvoidBlatantHookAssist, Localize("Помощь хуком (только по прицелу)"),
 				&g_Config.m_AvoidBlatantHookAssist, &Inner, LineSize);
+			DoButton_CheckBoxAutoVMarginAndSet(
+				&g_Config.m_AvoidBlatantAutoJump, Localize("Авто-прыжок"),
+				&g_Config.m_AvoidBlatantAutoJump, &Inner, LineSize);
 			Inner.HSplitTop(LineSize, &Button, &Inner);
 			Ui()->DoScrollbarOption(&g_Config.m_AvoidBlatantPredictTicks,
 				&g_Config.m_AvoidBlatantPredictTicks, &Button,

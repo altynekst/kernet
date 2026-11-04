@@ -350,9 +350,11 @@ void CAvoidBlatant::MakeInput(const CNetObj_PlayerInput &Raw, int Direction, int
 int CAvoidBlatant::BuildCandidates(const CNetObj_PlayerInput &Raw, const SHookAim &Hook, SCandidate *pOut) const
 {
 	int Count = 0;
-	const bool CanJump = (Raw.m_Jump & 1) == 0;
-	const int aJumps[2] = {Raw.m_Jump, 1};
-	const int NumJumps = CanJump ? 2 : 1;
+	// Pressing a new jump needs the auto jump option; releasing a held jump is
+	// always allowed (otherwise a jump into a freeze could not be cancelled).
+	const bool CanChangeJump = (Raw.m_Jump & 1) != 0 || g_Config.m_AvoidBlatantAutoJump;
+	const int aJumps[2] = {Raw.m_Jump, (Raw.m_Jump & 1) ? 0 : 1};
+	const int NumJumps = CanChangeJump ? 2 : 1;
 
 	int aHookModes[3];
 	int NumHookModes = 0;
@@ -399,9 +401,9 @@ bool CAvoidBlatant::GreedyRollout(int LocalId, const CNetObj_PlayerInput &Raw, c
 	};
 	SAction aActions[12];
 	int NumActions = 0;
-	const bool CanJump = (Raw.m_Jump & 1) == 0;
-	const int aJumps[2] = {Raw.m_Jump, 1};
-	const int NumJumps = CanJump ? 2 : 1;
+	const bool CanChangeJump = (Raw.m_Jump & 1) != 0 || g_Config.m_AvoidBlatantAutoJump;
+	const int aJumps[2] = {Raw.m_Jump, (Raw.m_Jump & 1) ? 0 : 1};
+	const int NumJumps = CanChangeJump ? 2 : 1;
 	for(int Direction = -1; Direction <= 1; ++Direction)
 	{
 		for(int JumpIndex = 0; JumpIndex < NumJumps; ++JumpIndex)
