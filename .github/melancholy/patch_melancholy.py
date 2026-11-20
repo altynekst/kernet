@@ -2138,6 +2138,393 @@ bool CMenusStart::CheckHotKey(int Key) const
 }
 '''
 
+AV_HOTKEYS_NEW = '\t\tstatic const char *const apLabels[] = {"Auto Drag", "Track Point", "Laser Unfreeze Bot"};\n\t\tstatic const char *const apCommands[] = {"+toggle krx_avoid_tile_auto_drag 1 0", "toggle krx_avoid_tile_track_points 1 0", "toggle krx_unfreezebot 1 0"};\n\t\tstatic CButtonContainer s_aKeyButtons[3], s_aClearButtons[3];\n\t\tfor(int Index = 0; Index < 3; ++Index)\n'
+
+AV_HOTKEYS_OLD = '\t\tstatic const char *const apLabels[] = {"Auto Drag", "Track Point"};\n\t\tstatic const char *const apCommands[] = {"+toggle krx_avoid_tile_auto_drag 1 0", "toggle krx_avoid_tile_track_points 1 0"};\n\t\tstatic CButtonContainer s_aKeyButtons[2], s_aClearButtons[2];\n\t\tfor(int Index = 0; Index < 2; ++Index)\n'
+
+AV_UF_CARD = '\tif(Card(Right, 65.0f + 40.0f * g_Config.m_KrxUnfreezeBot + (g_Config.m_KrxUnfreezeBot && g_Config.m_KrxUnfreezeBotAdvanced ? 120.0f : 0.0f), "Auto Unfreeze", Body))\n\t{\n\t\t// КРХ лазерный анфриз — карточка и подписи байт-в-байт как в Nullcki.\n\t\tCheck(Body, g_Config.m_KrxUnfreezeBot, "Enable");\n\t\tif(g_Config.m_KrxUnfreezeBot)\n\t\t{\n\t\t\tCheck(Body, g_Config.m_KrxUnfreezeBotEsp, "ESP");\n\t\t\tCheck(Body, g_Config.m_KrxUnfreezeBotAdvanced, "Advanced settings");\n\t\t\tif(g_Config.m_KrxUnfreezeBotAdvanced)\n\t\t\t{\n\t\t\t\tCheck(Body, g_Config.m_KrxUnfreezeBotMostBounces, g_Config.m_KrxUnfreezeBotMostBounces ? "Bounces: Most" : "Bounces: Least");\n\t\t\t\tCheck(Body, g_Config.m_KrxUnfreezeBotSilent, "Silent");\n\t\t\t\tSlider(Body, g_Config.m_KrxUnfreezeBotPoints, "Points", 1, 100);\n\t\t\t\tSlider(Body, g_Config.m_KrxUnfreezeBotCurDirTicks, "Current dir ticks", 1, 100);\n\t\t\t\tSlider(Body, g_Config.m_KrxUnfreezeBotTicks, "Ticks", 1, 100);\n\t\t\t\tSlider(Body, g_Config.m_KrxUnfreezeBotFov, "FOV", 1, 315);\n\t\t\t}\n\t\t}\n\t}\n'
+
+AV_VISUALS_ANCHOR = '\tif(Card(Right, 105.0f, "Visuals", Body))\n\t{\n\t\tCheck(Body, g_Config.m_AvoidDrawTrackPoint, "Track point", "Shows visuals for trackpoint");\n'
+
+BD_BIND = '\tif(g_Config.m_ClZzAutoUnfreezeKey >= KEY_FIRST && g_Config.m_ClZzAutoUnfreezeKey < KEY_LAST)\n\t\tBind(g_Config.m_ClZzAutoUnfreezeKey, "toggle cl_zz_auto_unfreeze 0 1", false, g_Config.m_ClZzAutoUnfreezeMod);\n'
+
+CFG_FULLDEBUG = 'MACRO_CONFIG_INT(ClZzFreezeFullDebugRecord, cl_zz_freeze_full_debug_record, 0,\n\t0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Record a full long-form freeze diagnostics session")\n\n'
+
+CFG_KEYMOD = 'MACRO_CONFIG_INT(ClZzAutoUnfreezeKey, cl_zz_auto_unfreeze_key, 0, 0, 512,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_HIDDEN,\n\t"KernelNet auto-unfreeze bind key")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeMod, cl_zz_auto_unfreeze_mod, 0, 0, 7,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_HIDDEN,\n\t"KernelNet auto-unfreeze bind modifier mask")\n'
+
+CFG_NEW_LU = 'MACRO_CONFIG_INT(KrxUnfreezeBot, krx_unfreezebot, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebot")\nMACRO_CONFIG_INT(KrxUnfreezeBotAdvanced, krx_unfreezebotadvancedsettings, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotadvancedsettings")\nMACRO_CONFIG_INT(KrxUnfreezeBotPoints, krx_unfreezebotpoints, 50, 0, 0, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotpoints")\nMACRO_CONFIG_INT(KrxUnfreezeBotMostBounces, krx_unfreezebotmostbounces, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotmostbounces")\nMACRO_CONFIG_INT(KrxUnfreezeBotTicks, krx_unfreezebotticks, 35, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotticks")\nMACRO_CONFIG_INT(KrxUnfreezeBotSilent, krx_unfreezebotsilent, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotsilent")\nMACRO_CONFIG_INT(KrxUnfreezeBotFov, krx_unfreezebotfov, 60, 1, 315, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotfov")\nMACRO_CONFIG_INT(KrxUnfreezeBotCurDirTicks, krx_unfreezebotcurdirticks, 21, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotcurdirticks")\nMACRO_CONFIG_INT(KrxUnfreezeBotEsp, krx_unfreezebotesp, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_unfreezebotesp")\n'
+
+CFG_NYMENU = 'MACRO_CONFIG_INT(ClZzNewYearMenu, cl_zz_newyear_menu, 0, 0, 1, CFGFLAG_CLIENT,\n\t"Show the New Year menu")\nMACRO_CONFIG_INT(ClZzNewYearMenuKey, cl_zz_newyear_menu_key, 64, 0, 512,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE, "New Year menu key (default F7)")\nMACRO_CONFIG_INT(ClZzNewYearMenuDecor, cl_zz_newyear_menu_decor, 1, 0, 1,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE, "Garland, snow and other decorations")\n'
+
+CFG_OLD_LU = 'MACRO_CONFIG_INT(ClZzAutoUnfreeze, cl_zz_auto_unfreeze, 0, 0, 1,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"KernelNet auto-unfreeze: predict freeze and fire a laser "\n\t"bounce before entering it")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeAutoLaser, cl_zz_auto_unfreeze_auto_laser, 1,\n\t0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze: automatically switch to laser before firing")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeFov, cl_zz_auto_unfreeze_fov, 90, 5, 360,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze field of view in degrees")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeAngles, cl_zz_auto_unfreeze_angles, 9, 1, 144,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze number of raycast angles")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeTicks, cl_zz_auto_unfreeze_ticks, 73, 8, 120,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze simulation ticks")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeTriggerTicks,\n\tcl_zz_auto_unfreeze_trigger_ticks, 3, 1, 5,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze freeze-trigger prediction ticks")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeSilent, cl_zz_auto_unfreeze_silent, 0, 0, 1,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze silent aim")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeShowAttempt,\n\tcl_zz_auto_unfreeze_show_attempt, 0, 0, 1,\n\tCFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Laser unfreeze: show successful attempt path")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeDebugRecord, cl_zz_auto_unfreeze_debug_record,\n\t0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE,\n\t"Record detailed KernelNet auto-unfreeze diagnostics")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeDirTicks, cl_zz_auto_unfreeze_dir_ticks, 10, 1, 40, CFGFLAG_CLIENT, "Auto-unfreeze dir ticks (commit window)")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeMaxPoints, cl_zz_auto_unfreeze_max_points, 5, 1, 10, CFGFLAG_CLIENT, "Auto-unfreeze max bounce points")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeMostBounces, cl_zz_auto_unfreeze_most_bounces, 0, 0, 1, CFGFLAG_CLIENT, "Auto-unfreeze prefer most bounces")\nMACRO_CONFIG_INT(ClZzAutoUnfreezeCurDirTicks, cl_zz_auto_unfreeze_cur_dir_ticks, 10, 1, 40, CFGFLAG_CLIENT, "Auto-unfreeze current direction ticks")\n'
+
+CG_ROOT_BIND = '\t\t{ERowType::KEYBIND, "Auto unfreeze", &CConfig::m_ClZzAutoUnfreezeKey, 0, 512, 1,\n\t\t\tnullptr, 0, "toggle cl_zz_auto_unfreeze 0 1", &CConfig::m_ClZzAutoUnfreezeMod},\n'
+
+CG_ROOT_ROWS = '\t\t{ERowType::TOGGLE, "Laser unfreeze", &CConfig::m_ClZzAutoUnfreeze, 0, 1, 1,\n\t\t\tnullptr, 0},\n\t\t{ERowType::TOGGLE, "Auto laser", &CConfig::m_ClZzAutoUnfreezeAutoLaser, 0,\n\t\t\t1, 1, nullptr, 0},\n\t\t{ERowType::SLIDER, "Laser FOV", &CConfig::m_ClZzAutoUnfreezeFov, 5, 360,\n\t\t\t5, nullptr, 0},\n\t\t{ERowType::SLIDER, "Laser angles", &CConfig::m_ClZzAutoUnfreezeAngles, 1,\n\t\t\t144, 1, nullptr, 0},\n\t\t{ERowType::SLIDER, "Laser ticks", &CConfig::m_ClZzAutoUnfreezeTicks, 1, 50,\n\t\t\t1, nullptr, 0},\n\t\t{ERowType::SLIDER, "Laser trigger ticks",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeTriggerTicks, 1, 5, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Laser silent", &CConfig::m_ClZzAutoUnfreezeSilent, 0,\n\t\t\t1, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Show laser attempt",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeShowAttempt, 0, 1, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Unfreeze debug recording",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeDebugRecord, 0, 1, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Full freeze session recording",\n\t\t\t&CConfig::m_ClZzFreezeFullDebugRecord, 0, 1, 1, nullptr, 0},\n'
+
+CG_TC_DEBUG = '\t\t{ERowType::TOGGLE, "Unfreeze debug recording",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeDebugRecord, 0, 1, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Full freeze session recording",\n\t\t\t&CConfig::m_ClZzFreezeFullDebugRecord, 0, 1, 1, nullptr, 0},\n'
+
+CG_TC_ROWS = '\t\t{ERowType::TOGGLE, "Auto unfreeze", &CConfig::m_ClZzAutoUnfreeze, 0, 1, 1,\n\t\t\tnullptr, 0},\n\t\t{ERowType::TOGGLE, "Unfreeze: auto laser",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeAutoLaser, 0, 1, 1, nullptr, 0},\n\t\t{ERowType::SLIDER, "Unfreeze FOV", &CConfig::m_ClZzAutoUnfreezeFov, 5,\n\t\t\t360, 5, nullptr, 0},\n\t\t{ERowType::SLIDER, "Unfreeze angles", &CConfig::m_ClZzAutoUnfreezeAngles,\n\t\t\t1, 144, 1, nullptr, 0},\n\t\t{ERowType::SLIDER, "Unfreeze ticks", &CConfig::m_ClZzAutoUnfreezeTicks, 1,\n\t\t\t50, 1, nullptr, 0},\n\t\t{ERowType::SLIDER, "Unfreeze trigger ticks",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeTriggerTicks, 1, 5, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Unfreeze: silent",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeSilent, 0, 1, 1, nullptr, 0},\n\t\t{ERowType::TOGGLE, "Unfreeze: show attempt",\n\t\t\t&CConfig::m_ClZzAutoUnfreezeShowAttempt, 0, 1, 1, nullptr, 0},\n'
+
+CT_AIM_CHANNEL = "\t// Kinetix Laser Unfreeze silent aim has final aim priority. It is applied\n\t// after the visible mouse position was converted to input, so the server\n\t// receives the bounce direction while the user's crosshair stays untouched.\n\tconst bool LaserUnfreezeAimActive = m_LaserUnfreezeAimActive;\n\tif(LaserUnfreezeAimActive)\n\t{\n\t\tm_aInputData[g_Config.m_ClDummy].m_TargetX =\n\t\t\t(int)m_LaserUnfreezeAimOffset.x;\n\t\tm_aInputData[g_Config.m_ClDummy].m_TargetY =\n\t\t\t(int)m_LaserUnfreezeAimOffset.y;\n\t\tif(m_aInputData[g_Config.m_ClDummy].m_TargetX == 0 &&\n\t\t\tm_aInputData[g_Config.m_ClDummy].m_TargetY == 0)\n\t\t\tm_aInputData[g_Config.m_ClDummy].m_TargetY = 1;\n\t\tm_LaserUnfreezeAimActive = false;\n\t}\n\n"
+
+CT_CHAIN_ANCHOR = '\t\t\tm_aInputData[KrxSlot] = GameClient()->m_ClassicAvoid.AdjustInput(GameClient(), m_aInputData[KrxSlot], KrxClientId);\n'
+
+CT_GATE_NEW = '(g_Config.m_AvoidFreeze || g_Config.m_KrxUnfreezeBot)'
+
+CT_GATE_OLD = '(g_Config.m_AvoidFreeze || g_Config.m_ClZzAutoUnfreeze)'
+
+CT_H_FIELDS = '\n\t// Kinetix Laser Unfreeze silent input channel. UpdateLaserUnfreeze sets\n\t// this without moving m_aMousePos; SnapInput consumes it immediately before\n\t// the packet is copied to the network buffer.\n\tbool m_LaserUnfreezeAimActive = false;\n\tvec2 m_LaserUnfreezeAimOffset = vec2(0.0f, 0.0f);\n\n'
+
+CT_ONPLAYERINPUT = '\t\t// CLaserUnfreeze must run after mouse target and fire were\n\t\t// assembled above, otherwise its aim is overwritten.\n\t\tif(Client()->State() == IClient::STATE_ONLINE ||\n\t\t\tClient()->State() == IClient::STATE_DEMOPLAYBACK)\n\t\t\tGameClient()->m_LaserUnfreeze.OnPlayerInput(\n\t\t\t\t&m_aInputData[g_Config.m_ClDummy],\n\t\t\t\t&m_aLastData[g_Config.m_ClDummy]);\n\n'
+
+GC_C_CMT_NYSNAP = '\t// AutoUnfreezeObserveRawLasers(); // отключено: старый AutoUnfreeze\n'
+
+GC_C_CMT_ONSNAP = '\t\t// AutoUnfreezeDebugUpdateRecording(); // отключено: старый AutoUnfreeze\n'
+
+GC_C_DBGSTOP_SHUTDOWN = 'void CGameClient::OnShutdown()\n{\n\tAutoUnfreezeDebugStop();\n'
+
+GC_C_DBGSTOP_STATE = '\tif(OldState >= IClient::STATE_ONLINE && NewState < IClient::STATE_ONLINE)\n\t{\n\t\tAutoUnfreezeDebugStop();\n'
+
+GC_C_FULLREC1 = '\t\t\t\t\t\t\tif(m_AutoUnfreezeDebugFullRecording &&\n\t\t\t\t\t\t\t\tAutoUnfreezeDebugCandidateCount <\n\t\t\t\t\t\t\t\t\tAutoUnfreezeDebugMaxCandidates)\n\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\taAutoUnfreezeDebugCandidateDir\n\t\t\t\t\t\t\t\t\t[AutoUnfreezeDebugCandidateCount] = Dir;\n\t\t\t\t\t\t\t\taAutoUnfreezeDebugCandidateDelay\n\t\t\t\t\t\t\t\t\t[AutoUnfreezeDebugCandidateCount] = HitDelay;\n\t\t\t\t\t\t\t\taAutoUnfreezeDebugCandidateQuality\n\t\t\t\t\t\t\t\t\t[AutoUnfreezeDebugCandidateCount] = Quality;\n\t\t\t\t\t\t\t\tAutoUnfreezeDebugCandidateCount++;\n\t\t\t\t\t\t\t}\n'
+
+GC_C_FULLREC2 = '\t\t\t\t\t\t\tif(!m_AutoUnfreezeDebugFullRecording)\n\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\tAutoUnfreezeDebugCandidateCount =\n\t\t\t\t\t\t\t\t\tminimum(NumExactCandidates, AutoUnfreezeDebugMaxCandidates);\n\t\t\t\t\t\t\t\tfor(int CandidateIndex = 0;\n\t\t\t\t\t\t\t\t\tCandidateIndex < AutoUnfreezeDebugCandidateCount;\n\t\t\t\t\t\t\t\t\tCandidateIndex++)\n\t\t\t\t\t\t\t\t{\n\t\t\t\t\t\t\t\t\taAutoUnfreezeDebugCandidateDir[CandidateIndex] =\n\t\t\t\t\t\t\t\t\t\taExactCandidates[CandidateIndex].m_Dir;\n\t\t\t\t\t\t\t\t\taAutoUnfreezeDebugCandidateDelay[CandidateIndex] =\n\t\t\t\t\t\t\t\t\t\taExactCandidates[CandidateIndex].m_HitDelay;\n\t\t\t\t\t\t\t\t\taAutoUnfreezeDebugCandidateQuality[CandidateIndex] =\n\t\t\t\t\t\t\t\t\t\taExactCandidates[CandidateIndex].m_Quality;\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\n'
+
+GC_C_HELPERS_END = 'void CGameClient::UpdateFlyRide()'
+
+GC_C_HELPERS_START = 'float CGameClient::AutoUnfreezeLearningBias(int DummyIndex, uint64_t Key,'
+
+GC_C_KINETIX_CMT = '\t/* ResetKinetixLaserUnfreeze(); */\n'
+
+GC_C_KINETIX_CMT2 = '\t\t// Kinetix input ownership is evaluated exactly once, on the final packet.\n'
+
+GC_C_KINETIX_END = 'int CGameClient::OnSnapInput(int *pData, int Conn, bool Force)'
+
+GC_C_KINETIX_START = 'void CGameClient::ResetKinetixLaserUnfreeze()'
+
+GC_C_LEARN_RESET = '\tfor(auto &DummyLearning : m_aaAutoUnfreezeLearning)\n\t\tfor(auto &Entry : DummyLearning)\n\t\t\tEntry = {};\n'
+
+GC_C_OBSCALL = '\t\t\t\t\t\t\t\tAutoUnfreezeStartShotObservation(\n\t\t\t\t\t\t\t\t\tDummyIndex, LocalId, AnalysisTick, SentGameTick,\n\t\t\t\t\t\t\t\t\tEstimatedServerShotTick,\n\t\t\t\t\t\t\t\t\tEstimatedServerShotTick + BestHitDelay,\n\t\t\t\t\t\t\t\t\tEstimatedServerShotTick + BestHitDelay +\n\t\t\t\t\t\t\t\t\t\tPingUncertaintyTicks + 2,\n\t\t\t\t\t\t\t\t\tm_Snap.m_pLocalCharacter->m_AttackTick,\n\t\t\t\t\t\t\t\t\taExpectedShotOrigins, aArrivalLags, NumArrivalLags, BestDir,\n\t\t\t\t\t\t\t\t\tLearningKeyFor(BestDir, BestHitDelay, BestHitBounces),\n\t\t\t\t\t\t\t\t\tBestHitBounces, BestHitQuality);'
+
+GC_C_ONRESET_HOOK = '\tm_RocketSave.OnReset();\n'
+
+GC_C_REG_LU = '\t\t\t&m_LaserUnfreeze,\n'
+
+GC_C_REG_NY = '\t\t\t&m_ZZNewYearMenu,\n'
+
+GC_C_RENDER_CMT = '\t/* RenderKinetixLaserUnfreezeAttempt(); */\n'
+
+GC_C_RENDER_HOOK = '\tif(Client()->State() == IClient::STATE_ONLINE)\n\t\tm_Avoid.Render(this);\n'
+
+GC_C_WRITER_END = '\n\t\t\t}\n\n\t\t\t// KernelNet: hammer-gun'
+
+GC_C_WRITER_START = '\t\t\t\tif(m_pAutoUnfreezeDebugWriter &&\n'
+
+GC_H_AU_DECL = '\tvoid AutoUnfreezeDebugUpdateRecording();\n\tvoid AutoUnfreezeDebugStop();\n\tvoid AutoUnfreezeObserveRawLasers();\n\tvoid AutoUnfreezeStartShotObservation(\n\t\tint DummyIndex, int LocalId, int PredTick, int GameTick,\n\t\tint EstimatedServerShotTick, int ExpectedHitTick, int ExpireTick,\n\t\tint AttackTick, const vec2 *pExpectedOrigins,\n\t\tconst int *pExpectedPredictionLeads, int NumExpectedOrigins,\n\t\tconst vec2 &Direction, uint64_t LearningKey, int Bounces, float Quality);\n\tfloat AutoUnfreezeLearningBias(int DummyIndex, uint64_t Key, int Tick);\n\tvoid AutoUnfreezeApplyFeedback(int DummyIndex, uint64_t Key, int Result,\n\t\tint Tick);\n'
+
+GC_H_INCLUDE_LU = '#include "components/laserunfreeze.h"\n'
+
+GC_H_INCLUDE_NY = '#include "components/zz_newyearmenu.h"\n'
+
+GC_H_KINETIX = '\tbool ApplyKinetixLaserUnfreeze(CNetObj_PlayerInput *pInput, int DummyIndex,\n\t\tint LocalId);\n\tvoid ResetKinetixLaserUnfreeze();\n\tvoid RenderKinetixLaserUnfreezeAttempt();\n\tstruct SKinetixLaserUnfreezeState\n\t{\n\t\tbool m_WasFiring = false;\n\t\tbool m_ReleaseRequired = false;\n\t\tint m_InjectedFire = -1;\n\t\tint m_AnalyzedTick = -1;\n\t\tint m_LocalId = -1;\n\t\tvec2 m_ShotAimOffset = vec2(0.0f, -1.0f);\n\t};\n\tSKinetixLaserUnfreezeState\n\t\tm_aKinetixLaserUnfreezeState[NUM_DUMMIES];\n\tstd::vector<vec2> m_vKinetixLaserUnfreezePath;\n\tint64_t m_KinetixLaserUnfreezePathTime = 0;\n'
+
+GC_H_LEARN = '\tstatic constexpr int AUTO_UNFREEZE_LEARNING_ENTRIES = 256;\n\tstruct SAutoUnfreezeLearningEntry\n\t{\n\t\tuint64_t m_Key = 0;\n\t\tfloat m_Score = 0.0f;\n\t\tint m_Successes = 0;\n\t\tint m_Failures = 0;\n\t\tint m_LastUsedTick = -1;\n\t};\n\tSAutoUnfreezeLearningEntry\n\t\tm_aaAutoUnfreezeLearning[NUM_DUMMIES][AUTO_UNFREEZE_LEARNING_ENTRIES];\n\tCJsonFileWriter *m_pAutoUnfreezeDebugWriter = nullptr;\n\tbool m_AutoUnfreezeDebugFullRecording = false;\n\tchar m_aAutoUnfreezeDebugFilename[512] = {};\n\tint m_aAutoUnfreezeDebugLastTick[NUM_DUMMIES] = {-1, -1, -1};\n\tbool m_aAutoUnfreezeDebugPrevFrozen[NUM_DUMMIES] = {};\n\tbool m_aAutoUnfreezeDebugPrevInFlight[NUM_DUMMIES] = {};\n\n'
+
+GC_H_MEMBER_LU = '\tCLaserUnfreeze m_LaserUnfreeze;\n'
+
+GC_H_MEMBER_NY = '\tCZZNewYearMenu m_ZZNewYearMenu;\n'
+
+HUD_LABEL = '\t\tif(g_Config.m_ClZzAutoUnfreeze)\n\t\t\tvLines.push_back("Auto unfreeze");\n'
+
+KC_C_ANCHOR = '                        Info = CServerInfo{};\n                return Info;\n        }\n}'
+
+KC_H_ANCHOR = '        unsigned ReferenceRand();\n'
+
+LU_CM_NY = '    components/zz_newyearmenu.cpp\n    components/zz_newyearmenu.h\n'
+
+LU_CM_OLD = '    components/laserunfreeze.cpp\n    components/laserunfreeze.h\n'
+
+LZ_C_HIT = '\t\treturn false;\n\tm_From = From;\n\tm_Pos = At;\n'
+
+LZ_H_GET = '\tconst int &GetEvalTick() const { return m_EvalTick; }\n'
+
+LZ_H_MEMBER = '\tint m_EvalTick;\n\tint m_Owner;\n'
+
+MS_DEBUG_ROWS = '                DoButton_CheckBoxAutoVMarginAndSet(\n                        &g_Config.m_ClZzAutoUnfreezeDebugRecord,\n                        Localize("Auto-unfreeze debug recording"),\n                        &g_Config.m_ClZzAutoUnfreezeDebugRecord, &Inner, LineSize);\n                DoButton_CheckBoxAutoVMarginAndSet(\n                        &g_Config.m_ClZzFreezeFullDebugRecord,\n                        Localize("Full freeze session recording"),\n                        &g_Config.m_ClZzFreezeFullDebugRecord, &Inner, LineSize);\n'
+
+MS_LU_PANEL = '        // Zz: Восстановленные блоки\n        {\n                CUIRect Inner, LuLabel, LuRow;\n                DoFeaturePanel(LeftView, 200.0f, Localize("Лазерный анфриз"), Inner);\n                Inner.HSplitTop(LineSize, &LuLabel, &Inner);\n                Ui()->DoLabel(&LuLabel,\n                        Localize("Автоматически ищет безопасный рикошет лазера"),\n                        14.0f, TEXTALIGN_ML);\n                Inner.HSplitTop(5.0f, nullptr, &Inner);\n                DoButton_CheckBoxAutoVMarginAndSet(\n                        &g_Config.m_ClZzAutoUnfreeze, Localize("Включить"),\n                        &g_Config.m_ClZzAutoUnfreeze, &Inner, LineSize);\n                DoButton_CheckBoxAutoVMarginAndSet(\n                        &g_Config.m_ClZzAutoUnfreezeSilent, Localize("Тихий прицел"),\n                        &g_Config.m_ClZzAutoUnfreezeSilent, &Inner, LineSize);\n                DoButton_CheckBoxAutoVMarginAndSet(\n                        &g_Config.m_ClZzAutoUnfreezeMostBounces,\n                        Localize("Предпочитать больше отскоков"),\n                        &g_Config.m_ClZzAutoUnfreezeMostBounces, &Inner, LineSize);\n                Inner.HSplitTop(LineSize, &LuRow, &Inner);\n                Ui()->DoScrollbarOption(&g_Config.m_ClZzAutoUnfreezeFov,\n                        &g_Config.m_ClZzAutoUnfreezeFov, &LuRow,\n                        Localize("Угол обзора"), 5, 360,\n                        &CUi::ms_LinearScrollbarScale, 0u, " °");\n                Inner.HSplitTop(LineSize, &LuRow, &Inner);\n                Ui()->DoScrollbarOption(&g_Config.m_ClZzAutoUnfreezeTicks,\n                        &g_Config.m_ClZzAutoUnfreezeTicks, &LuRow,\n                        Localize("Предсказание"), 8, 120);\n                Inner.HSplitTop(LineSize, &LuRow, &Inner);\n                Ui()->DoScrollbarOption(&g_Config.m_ClZzAutoUnfreezeDirTicks,\n                        &g_Config.m_ClZzAutoUnfreezeDirTicks, &LuRow,\n                        Localize("Окно обнаружения"), 1, 40);\n                Inner.HSplitTop(LineSize, &LuRow, &Inner);\n                Ui()->DoScrollbarOption(&g_Config.m_ClZzAutoUnfreezeMaxPoints,\n                        &g_Config.m_ClZzAutoUnfreezeMaxPoints, &LuRow,\n                        Localize("Отскоки"), 1, 10);\n        }\n\n'
+
+TOAST_ROOT = '\t\tg_Config.m_ClZzFngAutoLaser, g_Config.m_ClZzAutoUnfreeze,\n'
+
+TOAST_ROOT_NAMES = '\tconst char *apNames[] = {"Aimbot", "Hook aim", "Hammer assist", "Auto ALED",\n\t\t"FNG auto laser", "Auto unfreeze", "Avoid", "Hook drive",\n'
+
+TOAST_TCLIENT = '\tconst int aCurrent[] = {\n\t\tg_Config.m_ClZzAimbotEnabled, g_Config.m_ClZzAutoUnfreeze,\n\t\tg_Config.m_ClZzBalanceBot, g_Config.m_ClZzFngAutoLaser,\n\t\tg_Config.m_ClZzFlyHelperEnabled};\n\tconst char *apNames[] = {"Aimbot", "Auto unfreeze", "Balance bot",\n\t\t"FNG laser", "Fly helper"};\n'
+
+ZZV_H_COUNT = '\tstatic constexpr int FEATURE_WATCH_COUNT = 12;\n'
+
+UNFREEZE_BOT_H = '#ifndef GAME_CLIENT_AVOID_UNFREEZE_BOT_H\n#define GAME_CLIENT_AVOID_UNFREEZE_BOT_H\n\n#include <cstdint>\n\n// The generated protocol uses int32_t through its message dependencies.\n#include <base/vmath.h>\n\n#include <generated/protocol.h>\n\n#include <vector>\n\nclass CGameClient;\nclass CGameWorld;\n\nnamespace OpenKrx\n{\n\t// КРХ лазерный анфриз (Unfreeze Bot) — порт из Nullcki @ 59e02c5,\n\t// класс CRescueBots: в melancholy перенесён только путь лазерного\n\t// анфриза (ProbeBeam / SearchUnfreezeWorld / AdjustAutoUnfreeze /\n\t// RenderUnfreeze). Логика и трассировка байтово соответствуют исходнику.\n\tclass CRescueBots\n\t{\n\t\tstruct CPulse\n\t\t{\n\t\t\tint m_Modulo = 0;\n\t\t\tbool Release(CNetObj_PlayerInput &Input, int GameTick);\n\t\t\tvoid Press(CNetObj_PlayerInput &Input);\n\t\t};\n\t\tCPulse m_UnfreezePulse;\n\t\tstd::vector<vec2> m_vUnfreezePath;\n\t\tstd::vector<vec2> m_vUnfreezeTeePath;\n\t\tvec2 m_LastUnfreezeAim = vec2(0, 0);\n\t\tbool m_UnfreezeAimReleased = true;\n\npublic:\n\t\tstruct CBeamResult\n\t\t{\n\t\t\tbool m_Found = false;\n\t\t\tvec2 m_Aim = vec2(0, 0);\n\t\t\tint m_Bounces = -1;\n\t\t\tfloat m_Speed = 0;\n\t\t\tstd::vector<vec2> m_vPath;\n\t\t\tstd::vector<vec2> m_vTeePath;\n\t\t};\n\t\tvoid OnReset();\n\t\tCNetObj_PlayerInput AdjustAutoUnfreeze(CGameClient *pGameClient, CNetObj_PlayerInput Input, int ClientId);\n\t\tconst std::vector<vec2> &UnfreezePath() const { return m_vUnfreezePath; }\n\t\tconst std::vector<vec2> &UnfreezeTeePath() const { return m_vUnfreezeTeePath; }\n\t\tvoid RenderUnfreeze(CGameClient *pGameClient);\n\t\tstatic CBeamResult ProbeBeam(const CGameWorld &Source, int ClientId, CNetObj_PlayerInput Input, int Ticks,\n\t\t\tbool RequireUnfreeze, CGameClient *pGameClient = nullptr, bool FullTrajectory = false);\n\t\tstatic CBeamResult SearchUnfreezeWorld(const CGameWorld &Source, int ClientId, CNetObj_PlayerInput Input,\n\t\t\tvec2 Mouse, int Ticks, int Points, float Fov, bool MostBounces, float MouseRadius, CGameClient *pGameClient = nullptr);\n\t};\n}\n\n#endif\n\n'
+
+UNFREEZE_BOT_CPP = '/* КРХ лазерный анфриз (Unfreeze Bot) — порт из Nullcki @ 59e02c5.\n   Только путь лазерного анфриза CRescueBots: ProbeBeam /\n   SearchUnfreezeWorld / AdjustAutoUnfreeze / RenderUnfreeze и\n   вспомогательные функции — тело каждого метода перенесено из\n   krx/rescue.cpp исходника байт-в-байт (кроме помеченных адаптаций). */\n\n#include "unfreeze_bot.h"\n\n#include "rocket_save.h"\n\n#include <engine/graphics.h>\n#include <engine/shared/config.h>\n\n#include <game/client/animstate.h>\n#include <game/client/avoid/krx_compat.h>\n#include <game/client/gameclient.h>\n#include <game/client/prediction/entities/character.h>\n#include <game/client/prediction/entities/laser.h>\n#include <game/client/prediction/gameworld.h>\n#include <game/client/render.h>\n#include <game/collision.h>\n#include <game/mapitems.h>\n\n#include <algorithm>\n#include <cmath>\n#include <random>\n\nnamespace OpenKrx\n{\n\tnamespace\n\t{\n\t\tvoid Tick(CGameWorld &World, int ClientId, const CNetObj_PlayerInput &Input)\n\t\t{\n\t\t\tif(CCharacter *pLocal = World.GetCharacterById(ClientId))\n\t\t\t{\n\t\t\t\tpLocal->OnDirectInput(&Input);\n\t\t\t\t++World.m_GameTick;\n\t\t\t\tpLocal->OnPredictedInput(&Input);\n\t\t\t\tWorld.Tick();\n\t\t\t}\n\t\t}\n\n\t\tbool Frozen(const CCharacter *pCharacter)\n\t\t{\n\t\t\treturn !pCharacter || pCharacter->m_FreezeTime > 0 || pCharacter->Core()->m_DeepFrozen || pCharacter->Core()->m_IsInFreeze;\n\t\t}\n\n\t\tvoid RemoveLasers(CGameWorld &World)\n\t\t{\n\t\t\tfor(CEntity *pEntity = World.FindFirst(CGameWorld::ENTTYPE_LASER); pEntity;)\n\t\t\t{\n\t\t\t\tCEntity *pNext = pEntity->TypeNext();\n\t\t\t\tdelete pEntity;\n\t\t\t\tpEntity = pNext;\n\t\t\t}\n\t\t}\n\n\t\tvoid FilterPlayers(CGameWorld &World, int ClientId, float Radius, CGameClient *pGameClient)\n\t\t{\n\t\t\tconst CCharacter *pLocal = World.GetCharacterById(ClientId);\n\t\t\tif(!pLocal)\n\t\t\t\treturn;\n\t\t\tfor(int Id = 0; Id < MAX_CLIENTS; ++Id)\n\t\t\t{\n\t\t\t\tCCharacter *pCharacter = World.GetCharacterById(Id);\n\t\t\t\tif(!pCharacter || Id == ClientId || pCharacter->m_IsLocal)\n\t\t\t\t\tcontinue;\n\t\t\t\tif(distance(pLocal->m_Pos, pCharacter->m_Pos) > Radius ||\n\t\t\t\t\t(pGameClient && ((!pGameClient->m_Snap.m_aCharacters[Id].m_Active && pCharacter->m_SnapTicks > 10) || pGameClient->IsOtherTeam(Id))))\n\t\t\t\t\tdelete pCharacter;\n\t\t\t}\n\t\t}\n\n\t\tbool Playing(CGameClient *pGameClient, const CNetObj_PlayerInput &Input, int ClientId)\n\t\t{\n\t\t\treturn ClientId >= 0 && ClientId < MAX_CLIENTS &&\n\t\t\t       pGameClient->Client()->State() == IClient::STATE_ONLINE &&\n\t\t\t       (Input.m_PlayerFlags & PLAYERFLAG_PLAYING) &&\n\t\t\t       !pGameClient->m_Snap.m_SpecInfo.m_Active;\n\t\t}\n\n\t\tCNetObj_PlayerInput MouseInput(CGameClient *pGameClient, CNetObj_PlayerInput Input)\n\t\t{\n\t\t\tInput.m_TargetX = (int)pGameClient->m_Controls.m_aMousePos[g_Config.m_ClDummy].x;\n\t\t\tInput.m_TargetY = (int)pGameClient->m_Controls.m_aMousePos[g_Config.m_ClDummy].y;\n\t\t\treturn Input;\n\t\t}\n\n\t\tvoid Aim(CGameClient *pGameClient, CNetObj_PlayerInput &Input, vec2 Direction, bool Silent)\n\t\t{\n\t\t\tInput.m_TargetX = (int)Direction.x;\n\t\t\tInput.m_TargetY = (int)Direction.y;\n\t\t\tif(!Silent)\n\t\t\t\tpGameClient->m_Controls.m_aMousePos[g_Config.m_ClDummy] = Direction;\n\t\t}\n\n\t\tint Life(const CGameWorld &Source, int ClientId, const CNetObj_PlayerInput &Input, int Ticks)\n\t\t{\n\t\t\tCGameWorld World;\n\t\t\tWorld.CopyWorldIsolated(&Source);\n\t\t\tWorld.m_WorldConfig.m_PredictWeapons = true;\n\t\t\tWorld.m_WorldConfig.m_KrxPrediction = true;\n\t\t\tif(!World.GetCharacterById(ClientId))\n\t\t\t\treturn -1;\n\t\t\tfor(int Step = 0; Step <= Ticks; ++Step)\n\t\t\t{\n\t\t\t\tTick(World, ClientId, Input);\n\t\t\t\tif(Frozen(World.GetCharacterById(ClientId)))\n\t\t\t\t\treturn Step;\n\t\t\t}\n\t\t\treturn 9999;\n\t\t}\n\n\t\tbool HasFreezeBetween(CCollision *pCollision, vec2 From, vec2 To)\n\t\t{\n\t\t\tconst int End = (int)(distance(From, To) + 1.0f);\n\t\t\tfor(int Step = 0; Step <= End; ++Step)\n\t\t\t{\n\t\t\t\tconst vec2 Position = mix(From, To, End ? Step / (float)End : 0.0f);\n\t\t\t\tconst vec2 Rounded(round_to_int(Position.x), round_to_int(Position.y));\n\t\t\t\tif(pCollision->GetTileIndex(pCollision->GetPureMapIndex(Rounded)) == TILE_FREEZE)\n\t\t\t\t\treturn true;\n\t\t\t}\n\t\t\treturn false;\n\t\t}\n\n\t\t// MSVC\'s bounded introsort is significant for equal-scoring angles.\n\t\t// std::sort under GCC permutes these ties differently.\n\t\ttemplate<typename T, typename Better>\n\t\tvoid Median3(T &First, T &Middle, T &Last, Better Before)\n\t\t{\n\t\t\tif(Before(Middle, First))\n\t\t\t\tstd::swap(Middle, First);\n\t\t\tif(Before(Last, Middle))\n\t\t\t{\n\t\t\t\tstd::swap(Last, Middle);\n\t\t\t\tif(Before(Middle, First))\n\t\t\t\t\tstd::swap(Middle, First);\n\t\t\t}\n\t\t}\n\n\t\ttemplate<typename It, typename Better>\n\t\tstd::pair<It, It> Partition(It First, It Last, Better Before)\n\t\t{\n\t\t\tconst auto Equal = [&](const auto &A, const auto &B) { return !Before(A, B) && !Before(B, A); };\n\t\t\tIt Middle = First + (Last - First) / 2, Final = Last - 1;\n\t\t\tif(Last - First > 41)\n\t\t\t{\n\t\t\t\tconst auto Step = (Last - First) / 8;\n\t\t\t\tMedian3(*First, *(First + Step), *(First + 2 * Step), Before);\n\t\t\t\tMedian3(*(Middle - Step), *Middle, *(Middle + Step), Before);\n\t\t\t\tMedian3(*(Final - 2 * Step), *(Final - Step), *Final, Before);\n\t\t\t\tMedian3(*(First + Step), *Middle, *(Final - Step), Before);\n\t\t\t}\n\t\t\telse\n\t\t\t\tMedian3(*First, *Middle, *Final, Before);\n\t\t\tIt PivotFirst = Middle, PivotLast = Middle + 1;\n\t\t\twhile(First < PivotFirst && Equal(*(PivotFirst - 1), *PivotFirst))\n\t\t\t\t--PivotFirst;\n\t\t\twhile(PivotLast < Last && Equal(*PivotLast, *PivotFirst))\n\t\t\t\t++PivotLast;\n\t\t\tIt GreaterFirst = PivotLast, GreaterLast = PivotFirst;\n\t\t\tfor(;;)\n\t\t\t{\n\t\t\t\tfor(; GreaterFirst < Last; ++GreaterFirst)\n\t\t\t\t{\n\t\t\t\t\tif(Before(*PivotFirst, *GreaterFirst))\n\t\t\t\t\t\tcontinue;\n\t\t\t\t\tif(Before(*GreaterFirst, *PivotFirst))\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tif(PivotLast != GreaterFirst)\n\t\t\t\t\t\tstd::iter_swap(PivotLast, GreaterFirst);\n\t\t\t\t\t++PivotLast;\n\t\t\t\t}\n\t\t\t\tfor(; First < GreaterLast; --GreaterLast)\n\t\t\t\t{\n\t\t\t\t\tconst It Previous = GreaterLast - 1;\n\t\t\t\t\tif(Before(*Previous, *PivotFirst))\n\t\t\t\t\t\tcontinue;\n\t\t\t\t\tif(Before(*PivotFirst, *Previous))\n\t\t\t\t\t\tbreak;\n\t\t\t\t\tif(--PivotFirst != Previous)\n\t\t\t\t\t\tstd::iter_swap(PivotFirst, Previous);\n\t\t\t\t}\n\t\t\t\tif(GreaterLast == First && GreaterFirst == Last)\n\t\t\t\t\treturn {PivotFirst, PivotLast};\n\t\t\t\tif(GreaterLast == First)\n\t\t\t\t{\n\t\t\t\t\tif(PivotLast != GreaterFirst)\n\t\t\t\t\t\tstd::iter_swap(PivotFirst, PivotLast);\n\t\t\t\t\t++PivotLast;\n\t\t\t\t\tstd::iter_swap(PivotFirst, GreaterFirst);\n\t\t\t\t\t++PivotFirst;\n\t\t\t\t\t++GreaterFirst;\n\t\t\t\t}\n\t\t\t\telse if(GreaterFirst == Last)\n\t\t\t\t{\n\t\t\t\t\tif(--GreaterLast != --PivotFirst)\n\t\t\t\t\t\tstd::iter_swap(GreaterLast, PivotFirst);\n\t\t\t\t\tstd::iter_swap(PivotFirst, --PivotLast);\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{\n\t\t\t\t\tstd::iter_swap(GreaterFirst, --GreaterLast);\n\t\t\t\t\t++GreaterFirst;\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\ttemplate<typename It, typename Better>\n\t\tvoid ReferenceSort(It First, It Last, Better Before)\n\t\t{\n\t\t\twhile(Last - First > 32)\n\t\t\t{\n\t\t\t\tconst auto [PivotFirst, PivotLast] = Partition(First, Last, Before);\n\t\t\t\tif(PivotFirst - First < Last - PivotLast)\n\t\t\t\t{\n\t\t\t\t\tReferenceSort(First, PivotFirst, Before);\n\t\t\t\t\tFirst = PivotLast;\n\t\t\t\t}\n\t\t\t\telse\n\t\t\t\t{\n\t\t\t\t\tReferenceSort(PivotLast, Last, Before);\n\t\t\t\t\tLast = PivotFirst;\n\t\t\t\t}\n\t\t\t}\n\t\t\tif(First == Last)\n\t\t\t\treturn;\n\t\t\tfor(It Current = First + 1; Current != Last; ++Current)\n\t\t\t{\n\t\t\t\tauto Value = *Current;\n\t\t\t\tIt Hole = Current;\n\t\t\t\twhile(Hole != First && Before(Value, *(Hole - 1)))\n\t\t\t\t{\n\t\t\t\t\t*Hole = *(Hole - 1);\n\t\t\t\t\t--Hole;\n\t\t\t\t}\n\t\t\t\t*Hole = Value;\n\t\t\t}\n\t\t}\n\t}\n\n\tvoid CRescueBots::OnReset()\n\t{\n\t\t// Pulse counters are process statics; aim/path are component fields.\n\t\t// The native base reset does not clear either set of retained state.\n\t}\n\n\tbool CRescueBots::CPulse::Release(CNetObj_PlayerInput &Input, int GameTick)\n\t{\n\t\tif(m_Modulo == 0)\n\t\t\treturn true;\n\t\tif(GameTick % m_Modulo == 0 && (Input.m_Fire & 1))\n\t\t{\n\t\t\t++Input.m_Fire;\n\t\t\tm_Modulo = 0;\n\t\t\treturn true;\n\t\t}\n\t\treturn false;\n\t}\n\n\tvoid CRescueBots::CPulse::Press(CNetObj_PlayerInput &Input)\n\t{\n\t\t++Input.m_Fire;\n\t\tstatic std::mt19937 s_Generator(std::random_device{}());\n\t\tm_Modulo = std::uniform_int_distribution<int>(1, 5)(s_Generator);\n\t}\n\n\tCRescueBots::CBeamResult CRescueBots::ProbeBeam(const CGameWorld &Source, int ClientId,\n\t\tCNetObj_PlayerInput Input, int Ticks, bool RequireUnfreeze, CGameClient *pGameClient, bool FullTrajectory)\n\t{\n\t\tCBeamResult Result;\n\t\tCGameWorld World;\n\t\tWorld.CopyWorldIsolated(&Source);\n\t\tWorld.m_WorldConfig.m_PredictWeapons = true;\n\t\tWorld.m_WorldConfig.m_KrxPrediction = true;\n\t\tWorld.m_WorldConfig.m_InfiniteAmmo = true;\n\t\tCCharacter *pLocal = World.GetCharacterById(ClientId);\n\t\tif(!pLocal)\n\t\t\treturn Result;\n\t\tif(!RequireUnfreeze)\n\t\t{\n\t\t\tWorld.m_WorldConfig.m_PredictTiles = true;\n\t\t\tWorld.m_WorldConfig.m_PredictFreeze = 1;\n\t\t\tWorld.m_WorldConfig.m_PredictDDRace = true;\n\t\t}\n\t\tif(RequireUnfreeze)\n\t\t\tFilterPlayers(World, ClientId, (float)World.TuningList()[0].m_LaserReach + 30.0f, pGameClient);\n\t\tRemoveLasers(World);\n\t\tInput.m_Fire = 1; // Native b6040/b71a0 replace Fire; they do not add2.\n\t\tint LastBounce = -1;\n\t\tfor(int Step = 0; Step <= Ticks; ++Step)\n\t\t{\n\t\t\tTick(World, ClientId, Input);\n\t\t\tpLocal = World.GetCharacterById(ClientId);\n\t\t\tif(!pLocal)\n\t\t\t\treturn Result;\n\t\t\tfor(CEntity *pEntity = World.FindFirst(CGameWorld::ENTTYPE_LASER); pEntity; pEntity = pEntity->TypeNext())\n\t\t\t{\n\t\t\t\tconst auto *pLaser = static_cast<CLaser *>(pEntity);\n\t\t\t\tif(pLaser->GetOwner() != ClientId)\n\t\t\t\t\tcontinue;\n\t\t\t\tResult.m_vPath.push_back(pLaser->m_Pos);\n\t\t\t\tif(pLaser->GetEnergy() < 0.0f)\n\t\t\t\t\tInput.m_Fire = 0;\n\t\t\t\tif(pLaser->GetHitClientId() == ClientId)\n\t\t\t\t{\n\t\t\t\t\tLastBounce = pLaser->GetBounces();\n\t\t\t\t\tif(!RequireUnfreeze)\n\t\t\t\t\t{\n\t\t\t\t\t\tResult.m_Found = true;\n\t\t\t\t\t\tResult.m_Bounces = LastBounce;\n\t\t\t\t\t\tResult.m_Speed = length(pLocal->Core()->m_Vel);\n\t\t\t\t\t\treturn Result;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t\t// b6040 retains a recorded self-hit while waiting for freeze to clear.\n\t\t\tResult.m_vTeePath.push_back(pLocal->m_Pos);\n\t\t\tif(RequireUnfreeze && LastBounce >= 0 && pLocal->m_FreezeTime < 1 && !pLocal->Core()->m_DeepFrozen)\n\t\t\t{\n\t\t\t\tResult.m_Found = true;\n\t\t\t\tResult.m_Bounces = LastBounce;\n\t\t\t\tResult.m_Speed = length(pLocal->Core()->m_Vel);\n\t\t\t\tif(!FullTrajectory)\n\t\t\t\t\treturn Result;\n\t\t\t}\n\t\t}\n\t\t// 369e20 records all Ticks+1 steps, and publishes no laser path if\n\t\t// no recorded self hit ever leaves FreezeTime/DeepFrozen cleared.\n\t\tif(FullTrajectory && !Result.m_Found)\n\t\t\tResult.m_vPath.clear();\n\t\treturn Result;\n\t}\n\n\tCRescueBots::CBeamResult CRescueBots::SearchUnfreezeWorld(const CGameWorld &Source, int ClientId,\n\t\tCNetObj_PlayerInput Input, vec2 Mouse, int Ticks, int Points, float Fov, bool MostBounces,\n\t\tfloat MouseRadius, CGameClient *pGameClient)\n\t{\n\t\tconst CCharacter *pLocal = const_cast<CGameWorld &>(Source).GetCharacterById(ClientId);\n\t\tif(!pLocal || Points <= 0 || Fov <= 0)\n\t\t\treturn {};\n\t\tstruct CScoredAim\n\t\t{\n\t\t\tvec2 m_Aim;\n\t\t\tint m_Bounces;\n\t\t};\n\t\tstd::vector<CScoredAim> vCandidates;\n\t\tconst float Span = Fov < 315.0f ? Fov * pi / 180.0f : 2.0f * pi;\n\t\tconst float Sector = Span / Points;\n\t\tconst float Center = angle(Mouse);\n\t\tfor(float SectorStart = Center - Span * 0.5f; SectorStart < Center + Span * 0.5f;)\n\t\t{\n\t\t\t// Native cb8f0 retains only the first wall direction of each sector.\n\t\t\tfor(int Index = 0; Index < Points; ++Index)\n\t\t\t{\n\t\t\t\tconst vec2 Direction = QuantizedAim(direction(SectorStart + Index * (Sector / Points)), MouseRadius);\n\t\t\t\tif(!Source.Collision()->IntersectLine(pLocal->m_Pos, pLocal->m_Pos + Direction, nullptr, nullptr))\n\t\t\t\t\tcontinue;\n\t\t\t\tCNetObj_PlayerInput Candidate = Input;\n\t\t\t\tCandidate.m_TargetX = (int)Direction.x;\n\t\t\t\tCandidate.m_TargetY = (int)Direction.y;\n\t\t\t\tconst auto Probe = ProbeBeam(Source, ClientId, Candidate, Ticks, true, pGameClient);\n\t\t\t\tif(Probe.m_Found)\n\t\t\t\t\tvCandidates.push_back({Direction, Probe.m_Bounces});\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tconst float Next = SectorStart + Sector;\n\t\t\tif(Next <= SectorStart)\n\t\t\t\tbreak;\n\t\t\tSectorStart = Next;\n\t\t}\n\t\tif(vCandidates.empty())\n\t\t\treturn {};\n\t\tReferenceSort(vCandidates.begin(), vCandidates.end(), [&](const CScoredAim &A, const CScoredAim &B) {\n\t\t\treturn MostBounces ? A.m_Bounces > B.m_Bounces : A.m_Bounces < B.m_Bounces;\n\t\t});\n\t\tCBeamResult Result;\n\t\tResult.m_Found = true;\n\t\tResult.m_Aim = vCandidates.front().m_Aim;\n\t\tResult.m_Bounces = vCandidates.front().m_Bounces;\n\t\treturn Result;\n\t}\n\n\tCNetObj_PlayerInput CRescueBots::AdjustAutoUnfreeze(CGameClient *pGameClient, CNetObj_PlayerInput Input, int ClientId)\n\t{\n\t\tif(!g_Config.m_KrxUnfreezeBotAdvanced)\n\t\t{\n\t\t\tg_Config.m_KrxUnfreezeBotCurDirTicks = 21;\n\t\t\tg_Config.m_KrxUnfreezeBotTicks = 35;\n\t\t\tg_Config.m_KrxUnfreezeBotPoints = 50;\n\t\t\tg_Config.m_KrxUnfreezeBotMostBounces = 0;\n\t\t\tg_Config.m_KrxUnfreezeBotFov = 315;\n\t\t\tg_Config.m_KrxUnfreezeBotSilent = 1;\n\t\t}\n\t\tconst int Slot = g_Config.m_ClDummy;\n\t\t// TAS в melancholy не портирован — блок восстановления удерживаемого\n\t\t// прицела TAS-мира из исходника (326690) опущен.\n\t\tif(!m_UnfreezePulse.Release(Input, pGameClient->m_GameWorld.GameTick()))\n\t\t\treturn Input;\n\t\tif(!g_Config.m_KrxUnfreezeBot || (Input.m_Fire & 1) || !Playing(pGameClient, Input, ClientId))\n\t\t{\n\t\t\tm_LastUnfreezeAim = vec2(0, 0);\n\t\t\tm_UnfreezeAimReleased = true;\n\t\t\treturn Input;\n\t\t}\n\t\tCCharacter *pAuthoritative = pGameClient->m_GameWorld.GetCharacterById(ClientId);\n\t\tif(!pAuthoritative || pAuthoritative->DiagnosticReloadTimer() > 0 ||\n\t\t\tIsKrxCharacterFrozen(pGameClient, ClientId) || !pAuthoritative->GetWeaponGot(WEAPON_LASER))\n\t\t\treturn Input;\n\t\tconst CGameWorld &Source = pGameClient->m_PredictedWorld;\n\t\tif(!const_cast<CGameWorld &>(Source).GetCharacterById(ClientId))\n\t\t\treturn Input;\n\t\tCNetObj_PlayerInput ProbeInput = MouseInput(pGameClient, Input);\n\t\tif(Life(Source, ClientId, ProbeInput, 3) > 2)\n\t\t\treturn Input;\n\t\t// cc190 prepares the weapon globally but probes its already-copied input.\n\t\tInput.m_WantedWeapon = WEAPON_LASER + 1;\n\t\tCGameWorld Advanced;\n\t\tAdvanced.CopyWorldIsolated(&Source);\n\t\tAdvanced.m_WorldConfig.m_PredictWeapons = true;\n\t\tAdvanced.m_WorldConfig.m_KrxPrediction = true;\n\t\tRemoveLasers(Advanced);\n\t\tfor(int Id = 0; Id < MAX_CLIENTS; ++Id)\n\t\t\tif(CCharacter *pCharacter = Advanced.GetCharacterById(Id); pCharacter && Id != ClientId && !pCharacter->m_IsLocal)\n\t\t\t\tdelete pCharacter;\n\t\tTick(Advanced, ClientId, ProbeInput);\n\t\tTick(Advanced, ClientId, ProbeInput);\n\t\tif(ProbeBeam(Advanced, ClientId, ProbeInput, g_Config.m_KrxUnfreezeBotCurDirTicks, true, pGameClient).m_Found)\n\t\t\treturn Input;\n\t\tconst float Radius = pGameClient->m_Controls.GetMaxMouseDistance();\n\t\tconst vec2 Mouse = pGameClient->m_Controls.m_aMousePos[Slot];\n\t\tauto Result = ProbeBeam(Source, ClientId, ProbeInput, g_Config.m_KrxUnfreezeBotCurDirTicks, true, pGameClient);\n\t\tif(Result.m_Found)\n\t\t\tResult.m_Aim = vec2(ProbeInput.m_TargetX, ProbeInput.m_TargetY);\n\t\telse\n\t\t\tResult = SearchUnfreezeWorld(Source, ClientId, ProbeInput, Mouse, g_Config.m_KrxUnfreezeBotTicks,\n\t\t\t\tg_Config.m_KrxUnfreezeBotPoints, (float)g_Config.m_KrxUnfreezeBotFov,\n\t\t\t\tg_Config.m_KrxUnfreezeBotMostBounces, Radius, pGameClient);\n\t\tif(!Result.m_Found)\n\t\t\treturn Input;\n\t\tm_LastUnfreezeAim = QuantizedAim(Result.m_Aim, Radius);\n\t\tCNetObj_PlayerInput PathInput = ProbeInput;\n\t\tPathInput.m_TargetX = (int)m_LastUnfreezeAim.x;\n\t\tPathInput.m_TargetY = (int)m_LastUnfreezeAim.y;\n\t\tauto Path = ProbeBeam(Source, ClientId, PathInput, g_Config.m_KrxUnfreezeBotTicks, true, pGameClient, true);\n\t\tm_vUnfreezePath = std::move(Path.m_vPath);\n\t\tm_vUnfreezeTeePath = std::move(Path.m_vTeePath);\n\t\tm_UnfreezeAimReleased = false;\n\t\tAim(pGameClient, Input, m_LastUnfreezeAim, g_Config.m_KrxUnfreezeBotSilent);\n\t\tm_UnfreezePulse.Press(Input);\n\t\treturn Input;\n\t}\n\n\tvoid CRescueBots::RenderUnfreeze(CGameClient *pGameClient)\n\t{\n\t\tif(!g_Config.m_KrxUnfreezeBot || !g_Config.m_KrxUnfreezeBotEsp || m_vUnfreezePath.empty() || m_vUnfreezeTeePath.empty())\n\t\t\treturn;\n\t\tauto *pGraphics = pGameClient->Graphics();\n\t\tconst auto PreviousScreen = AvoidGetScreen(pGraphics);\n\t\tconst auto &Camera = pGameClient->m_Camera;\n\t\tAvoidMapScreen(pGraphics, AvoidMapScreenToWorld(pGraphics, Camera.m_Center.x, Camera.m_Center.y, 100, 100, 100, 0, 0, pGraphics->ScreenAspect(), Camera.m_Zoom));\n\t\tpGraphics->TextureClear();\n\t\tpGraphics->QuadsBegin();\n\t\tpGraphics->SetColor(0, 0, 1, 1);\n\t\tvec2 From = m_vUnfreezeTeePath.front();\n\t\tfor(const vec2 To : m_vUnfreezePath)\n\t\t{\n\t\t\tif(distance(From, To) > 0)\n\t\t\t{\n\t\t\t\t// 30fff0\'s centered thick quad uses width scaled by camera zoom.\n\t\t\t\tconst vec2 Offset = normalize(vec2(To.y - From.y, From.x - To.x)) * (1.5f * Camera.m_Zoom);\n\t\t\t\tIGraphics::CFreeformItem Line(From.x - Offset.x, From.y - Offset.y,\n\t\t\t\t\tFrom.x + Offset.x, From.y + Offset.y, To.x - Offset.x, To.y - Offset.y, To.x + Offset.x, To.y + Offset.y);\n\t\t\t\tpGraphics->QuadsDrawFreeform(&Line, 1);\n\t\t\t}\n\t\t\tFrom = To;\n\t\t}\n\t\tpGraphics->QuadsEnd();\n\t\tconst int Id = pGameClient->m_aLocalIds[g_Config.m_ClDummy];\n\t\tif(Id >= 0 && Id < MAX_CLIENTS)\n\t\t{\n\t\t\tauto RenderInfo = pGameClient->m_aClients[Id].m_RenderInfo;\n\t\t\tpGameClient->RenderTools()->RenderTee(CAnimState::GetIdle(), &RenderInfo, 1, vec2(1, 0), m_vUnfreezeTeePath.front());\n\t\t\tpGameClient->RenderTools()->RenderTee(CAnimState::GetIdle(), &RenderInfo, 2, vec2(1, 0), m_vUnfreezePath.back());\n\t\t}\n\t\tAvoidMapScreen(pGraphics, PreviousScreen);\n\t}\n}\n'
+
+# ---------------------------------------------------------------- 9d. лазерный анфриз: старый удалить, крх-порт вставить
+print("== 9d. лазерный анфриз: старый (KernelNet/Kinetix) удалить, крх-порт вставить")
+
+def cut_between(path, start, end, label):
+    if not os.path.exists(path):
+        fail("%s: нет файла (%s)" % (path, label))
+        return
+    s = rd(path)
+    i = s.find(start)
+    j = s.find(end, i + len(start)) if i >= 0 else -1
+    if i < 0 or j < 0:
+        fail("%s: маркеры вырезки не найдены (%s)" % (path, label))
+        return
+    wr(path, s[:i] + s[j:])
+    ok("%s :: %s (вырезано %d байт)" % (os.path.basename(path), label, j - i))
+
+# --- A. файлы старого лазерного анфриза и новогоднего окна автоанфриза
+for p in ["src/game/client/components/laserunfreeze.cpp",
+          "src/game/client/components/laserunfreeze.h",
+          "src/game/client/components/zz_newyearmenu.cpp",
+          "src/game/client/components/zz_newyearmenu.h"]:
+    if os.path.exists(p):
+        os.remove(p)
+        ok("удалён %s" % p)
+
+# --- B. CMakeLists: laserunfreeze -> unfreeze_bot (крх-порт)
+sub("CMakeLists.txt",
+    LU_CM_OLD,
+    "    avoid/unfreeze_bot.cpp\n    avoid/unfreeze_bot.h\n",
+    "CMakeLists: laserunfreeze -> avoid/unfreeze_bot")
+sub("CMakeLists.txt",
+    LU_CM_NY, "",
+    "CMakeLists: zz_newyearmenu убран")
+
+# --- C. gameclient.h
+sub("src/game/client/gameclient.h",
+    GC_H_INCLUDE_LU,
+    '#include "avoid/unfreeze_bot.h"\n',
+    "gameclient.h: laserunfreeze.h -> avoid/unfreeze_bot.h")
+sub("src/game/client/gameclient.h",
+    GC_H_INCLUDE_NY, "",
+    "gameclient.h: zz_newyearmenu.h убран")
+sub("src/game/client/gameclient.h",
+    GC_H_MEMBER_LU,
+    "\tOpenKrx::CRescueBots m_RescueBots;\n",
+    "gameclient.h: m_LaserUnfreeze -> OpenKrx::CRescueBots m_RescueBots")
+sub("src/game/client/gameclient.h",
+    GC_H_MEMBER_NY, "",
+    "gameclient.h: m_ZZNewYearMenu убран")
+sub("src/game/client/gameclient.h",
+    GC_H_KINETIX, "",
+    "gameclient.h: Kinetix-блок удалён")
+sub("src/game/client/gameclient.h",
+    GC_H_AU_DECL, "",
+    "gameclient.h: декларации AutoUnfreeze-хелперов удалены")
+sub("src/game/client/gameclient.h",
+    GC_H_LEARN, "",
+    "gameclient.h: learning/debug-поля удалены")
+
+# --- D. gameclient.cpp
+sub("src/game/client/gameclient.cpp",
+    GC_C_REG_LU, "",
+    "gameclient.cpp: регистрация m_LaserUnfreeze убрана")
+sub("src/game/client/gameclient.cpp",
+    GC_C_REG_NY, "",
+    "gameclient.cpp: регистрация m_ZZNewYearMenu убрана (2 списка)", count=2)
+cut_between("src/game/client/gameclient.cpp",
+            GC_C_HELPERS_START, GC_C_HELPERS_END,
+            "хелперы AutoUnfreeze (learning/observation/debug) удалены")
+cut_between("src/game/client/gameclient.cpp",
+            GC_C_KINETIX_START, GC_C_KINETIX_END,
+            "Kinetix-функции лазерного анфриза удалены")
+cut_between("src/game/client/gameclient.cpp",
+            GC_C_WRITER_START, GC_C_WRITER_END,
+            "debug-writer блок в OnSnapInput удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_FULLREC1, "",
+    "OnSnapInput: full-recording ветка 1 удалена")
+sub("src/game/client/gameclient.cpp",
+    GC_C_FULLREC2, "",
+    "OnSnapInput: full-recording ветка 2 удалена")
+sub("src/game/client/gameclient.cpp",
+    GC_C_OBSCALL, "",
+    "OnSnapInput: AutoUnfreezeStartShotObservation удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_CMT_ONSNAP, "",
+    "OnSnapInput: коммент-вызов debug recording удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_KINETIX_CMT2,
+    "\t\t// Input ownership is evaluated exactly once, on the final packet.\n",
+    "OnSnapInput: коммент Kinetix ownership обезличен")
+sub("src/game/client/gameclient.cpp",
+    GC_C_CMT_NYSNAP, "",
+    "OnNewSnapshot: коммент-вызов ObserveRawLasers удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_KINETIX_CMT, "",
+    "OnReset: коммент ResetKinetixLaserUnfreeze удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_LEARN_RESET, "",
+    "OnReset: сброс learning-таблиц удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_DBGSTOP_STATE,
+    "\tif(OldState >= IClient::STATE_ONLINE && NewState < IClient::STATE_ONLINE)\n\t{\n",
+    "OnStateChange: AutoUnfreezeDebugStop убран")
+sub("src/game/client/gameclient.cpp",
+    GC_C_DBGSTOP_SHUTDOWN,
+    "void CGameClient::OnShutdown()\n{\n",
+    "OnShutdown: AutoUnfreezeDebugStop убран")
+sub("src/game/client/gameclient.cpp",
+    GC_C_RENDER_CMT, "",
+    "OnRender: коммент RenderKinetixLaserUnfreezeAttempt удалён")
+sub("src/game/client/gameclient.cpp",
+    GC_C_RENDER_HOOK,
+    "\tif(Client()->State() == IClient::STATE_ONLINE)\n"
+    "\t\tm_RescueBots.RenderUnfreeze(this);\n"
+    "\t\tm_Avoid.Render(this);\n",
+    "gameclient.cpp: ESP крх-анфриза рендерится (как в Nullcki)")
+sub("src/game/client/gameclient.cpp",
+    GC_C_ONRESET_HOOK,
+    "\tm_RocketSave.OnReset();\n\tm_RescueBots.OnReset();\n",
+    "gameclient.cpp: OnReset крх-анфриза")
+
+# --- E. controls.cpp / controls.h / binds.cpp
+sub("src/game/client/components/controls.cpp",
+    CT_ONPLAYERINPUT, "",
+    "controls.cpp: вызов CLaserUnfreeze::OnPlayerInput удалён")
+sub("src/game/client/components/controls.cpp",
+    CT_AIM_CHANNEL, "",
+    "controls.cpp: silent-канал прицела Kinetix удалён")
+sub("src/game/client/components/controls.cpp",
+    CT_GATE_OLD, CT_GATE_NEW,
+    "controls.cpp: force-send гейт -> крх-анфриз")
+sub("src/game/client/components/controls.cpp",
+    CT_CHAIN_ANCHOR,
+    CT_CHAIN_ANCHOR +
+    "\t\t\t// КРХ лазерный анфриз: после цепочки Avoid, до Rocket Save (порядок Nullcki).\n"
+    "\t\t\tm_aInputData[KrxSlot] = GameClient()->m_RescueBots.AdjustAutoUnfreeze(GameClient(), m_aInputData[KrxSlot], KrxClientId);\n",
+    "controls.cpp: AdjustAutoUnfreeze в цепочке SnapInput")
+sub("src/game/client/components/controls.h",
+    CT_H_FIELDS, "",
+    "controls.h: silent-канал Kinetix удалён")
+sub("src/game/client/components/binds.cpp",
+    BD_BIND, "",
+    "binds.cpp: дефолт-бинд cl_zz_auto_unfreeze удалён")
+
+# --- F. конфиги: старые (13+2+1+3) -> крх KrxUnfreezeBot* (9 шт, 1-в-1 Nullcki)
+sub("src/engine/shared/config_variables.h",
+    CFG_OLD_LU, CFG_NEW_LU,
+    "конфиги: старый анфриз -> крх KrxUnfreezeBot* (9 шт)")
+sub("src/engine/shared/config_variables.h",
+    CFG_KEYMOD, "",
+    "конфиги: бинд-ключи старого анфриза удалены")
+sub("src/engine/shared/config_variables.h",
+    CFG_FULLDEBUG, "",
+    "конфиги: freeze-debug-запись удалена")
+sub("src/engine/shared/config_variables.h",
+    CFG_NYMENU, "",
+    "конфиги: новогоднее окно автоанфриза удалено")
+
+# --- G. HUD, тосты, clickgui, страницы настроек
+sub("src/game/client/components/hud.cpp",
+    HUD_LABEL, "",
+    "hud.cpp: метка Auto unfreeze удалена")
+sub("src/game/client/components/tclient/zz_visual_effects.cpp",
+    TOAST_TCLIENT,
+    "\tconst int aCurrent[] = {\n"
+    "\t\tg_Config.m_ClZzAimbotEnabled, g_Config.m_ClZzBalanceBot,\n"
+    "\t\tg_Config.m_ClZzFngAutoLaser, g_Config.m_ClZzFlyHelperEnabled};\n"
+    "\tconst char *apNames[] = {\"Aimbot\", \"Balance bot\", \"FNG laser\",\n"
+    "\t\t\"Fly helper\"};\n",
+    "tclient/zz_visual_effects.cpp: тост Auto unfreeze удалён")
+sub("src/game/client/components/zz_visual_effects.cpp",
+    TOAST_ROOT, "\t\tg_Config.m_ClZzFngAutoLaser,\n",
+    "zz_visual_effects.cpp: тост-конфиг Auto unfreeze удалён")
+sub("src/game/client/components/zz_visual_effects.cpp",
+    TOAST_ROOT_NAMES,
+    "\tconst char *apNames[] = {\"Aimbot\", \"Hook aim\", \"Hammer assist\", \"Auto ALED\",\n"
+    "\t\t\"FNG auto laser\", \"Avoid\", \"Hook drive\",\n",
+    "zz_visual_effects.cpp: тост-имя Auto unfreeze удалено")
+sub("src/game/client/components/zz_visual_effects.h",
+    ZZV_H_COUNT,
+    "\tstatic constexpr int FEATURE_WATCH_COUNT = 11;\n",
+    "zz_visual_effects.h: FEATURE_WATCH_COUNT 12 -> 11")
+sub("src/game/client/components/zz_clickgui.cpp",
+    CG_ROOT_ROWS, "",
+    "zz_clickgui.cpp: 10 строк старого анфриза удалены")
+sub("src/game/client/components/zz_clickgui.cpp",
+    CG_ROOT_BIND, "",
+    "zz_clickgui.cpp: бинд Auto unfreeze удалён")
+sub("src/game/client/components/tclient/zz_clickgui.cpp",
+    CG_TC_ROWS, "",
+    "tclient/zz_clickgui.cpp: 8 строк старого анфриза удалены")
+sub("src/game/client/components/tclient/zz_clickgui.cpp",
+    CG_TC_DEBUG, "",
+    "tclient/zz_clickgui.cpp: debug-записи анфриза удалены")
+sub("src/game/client/components/tclient/zz_menus_settings.cpp",
+    MS_LU_PANEL, "",
+    "zz_menus_settings.cpp: панель «Лазерный анфриз» удалена")
+sub("src/game/client/components/tclient/zz_menus_settings.cpp",
+    MS_DEBUG_ROWS, "",
+    "zz_menus_settings.cpp: debug-чекбоксы анфриза удалены")
+
+# --- H. крх-порт лазерного анфриза (Nullcki @ 59e02c5)
+wr("src/game/client/avoid/unfreeze_bot.h", UNFREEZE_BOT_H)
+ok("copy avoid/unfreeze_bot.h (крх лазерный анфриз)")
+wr("src/game/client/avoid/unfreeze_bot.cpp", UNFREEZE_BOT_CPP)
+ok("copy avoid/unfreeze_bot.cpp (ProbeBeam/SearchUnfreezeWorld/AdjustAutoUnfreeze/RenderUnfreeze)")
+
+sub("src/game/client/avoid/krx_compat.h",
+    KC_H_ANCHOR,
+    KC_H_ANCHOR +
+    "\n"
+    "        // КРХ квантизация прицела (CMiscFeatures::QuantizedAim из Nullcki,\n"
+    "        // krx/misc.cpp): нормализация к максимальной дистанции мыши.\n"
+    "        vec2 QuantizedAim(vec2 Direction, float Radius);\n",
+    "krx_compat.h: QuantizedAim")
+sub("src/game/client/avoid/krx_compat.cpp",
+    KC_C_ANCHOR,
+    "                        Info = CServerInfo{};\n                return Info;\n        }\n\n"
+    "        vec2 QuantizedAim(vec2 Direction, float Radius)\n"
+    "        {\n"
+    "                // 0x1402ba970 нормализует к полной дистанции мыши, затем\n"
+    "                // MSVC cvttss2si усекает компоненты до целых (реплика Nullcki).\n"
+    "                const float Length = length(Direction);\n"
+    "                if(Length == 0.0f)\n"
+    "                        return vec2(0, 0);\n"
+    "                const vec2 Scaled = (Direction / Length) * Radius;\n"
+    "                return vec2((int)Scaled.x, (int)Scaled.y);\n"
+    "        }\n"
+    "}",
+    "krx_compat.cpp: QuantizedAim")
+
+# предсказание: метаданные лазера для ProbeBeam (реплика prediction/laser Nullcki)
+sub("src/game/client/prediction/entities/laser.h",
+    LZ_H_GET,
+    LZ_H_GET +
+    "\t// OpenKRX (порт Nullcki): метаданные попадания для изолированных проб\n"
+    "\t// лазерного анфриза; на сами попадания не влияет.\n"
+    "\tint GetBounces() const { return m_Bounces; }\n"
+    "\tfloat GetEnergy() const { return m_Energy; }\n"
+    "\tint GetHitClientId() const { return m_HitClientId; }\n",
+    "laser.h: GetBounces/GetEnergy/GetHitClientId")
+sub("src/game/client/prediction/entities/laser.h",
+    LZ_H_MEMBER,
+    "\tint m_EvalTick;\n\tint m_HitClientId = -1;\n\tint m_Owner;\n",
+    "laser.h: m_HitClientId")
+sub("src/game/client/prediction/entities/laser.cpp",
+    LZ_C_HIT,
+    "\t\treturn false;\n\tm_HitClientId = pHit->GetCid();\n\tm_From = From;\n\tm_Pos = At;\n",
+    "laser.cpp: трекинг HitClientId (реплика Nullcki)")
+
+# --- I. меню: хоткей «Laser Unfreeze Bot» + карточка Auto Unfreeze (байт-в-байт Nullcki)
+sub("src/game/client/avoid/menus_settings_avoid.cpp",
+    AV_HOTKEYS_OLD, AV_HOTKEYS_NEW,
+    "меню: хоткей Laser Unfreeze Bot (toggle krx_unfreezebot 1 0)")
+sub("src/game/client/avoid/menus_settings_avoid.cpp",
+    AV_VISUALS_ANCHOR,
+    AV_UF_CARD + AV_VISUALS_ANCHOR,
+    "меню: карточка Auto Unfreeze (Enable/ESP/Advanced/Bounces/Silent/Points/Current dir ticks/Ticks/FOV)")
 # ---------------------------------------------------------------- 9c. Melancholy: настройки как на референсе (без зимнего слоя)
 print("== 9c. Melancholy: страница настроек как на референсе (без зимнего слоя)")
 
