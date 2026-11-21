@@ -123,6 +123,6 @@ jobs:
             --notes "Melancholy = kernet + порт крх-авойда из Nullcki @ ${NULLCKI_SHA}.
           Вкладка: Настройки -> KernelNet -> Avoid (дропдаун агентов: Basic/Legit/Blatant/Fent Bot/Pilot Bot).
           Лазерный анфриз (Auto Unfreeze + хоткей): Настройки -> KernelNet -> Разное.
-          КРХ ложный прицел (замена старого фейк-аима), самоубийство при попадании в фриз и Fly Bot из T+ во вкладке «Разное»; весь интерфейс новогодний; исправлена ошибка линковки fake_aim (undefined symbol).
+          Погода (снег/дождь/светлячки/пыль) и моушен блюр во вкладке «Визуал», фокус режим во вкладке «Разное» — порт из BestClient; весь интерфейс новогодний.
           Ставится поверх прошлых сборок melancholy — подпись та же." \
             --latest || gh release upload "melancholy-v${{ github.run_number }}" artifacts/*.apk --clobber

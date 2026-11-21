@@ -4264,6 +4264,1862 @@ sub("src/game/client/components/tclient/zz_menus_settings.cpp",
     '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
     "zz_menus_settings.cpp: панель Fly Bot в «Разном»")
 
+
+# ================================================================ 15. v1.1.11: Погода + Моушен блюр (BestClient @ 81ca85f) + Фокус режим
+
+# ================================================================ 15. v1.1.11: Погода + Моушен блюр (BestClient @ 81ca85f) + Фокус режим
+
+# ================================================================ 15. v1.1.11: Погода + Моушен блюр (BestClient @ 81ca85f) + Фокус режим
+
+# ================================================================ 15. v1.1.11: Погода + Моушен блюр (BestClient @ 81ca85f) + Фокус режим
+print("== 15. v1.1.11: Погода + Моушен блюр (BestClient @ 81ca85f) + Фокус режим")
+BC_DIR = "src/game/client/components/bestclient"
+wr('src/game/client/components/bestclient/motion_blur.h', r'''/* Copyright © 2026 BestProject Team */
+#ifndef GAME_CLIENT_COMPONENTS_BESTCLIENT_MOTION_BLUR_H
+#define GAME_CLIENT_COMPONENTS_BESTCLIENT_MOTION_BLUR_H
+
+#include <base/time.h>
+
+#include <engine/shared/config.h>
+
+#include <algorithm>
+#include <cmath>
+
+inline bool BcMotionBlurEnabled()
+{
+	return g_Config.m_BcMotionBlur != 0 && g_Config.m_BcMotionBlurStrength > 0;
+}
+
+inline float BcMotionBlurAdvanceFrameTime(int64_t &LastTime)
+{
+	const int64_t Now = time_get();
+	float FrameTime = 1.0f / 60.0f;
+	if(LastTime != 0)
+		FrameTime = (Now - LastTime) / (float)time_freq();
+	LastTime = Now;
+	return std::clamp(FrameTime, 0.001f, 0.1f);
+}
+
+inline float BcMotionBlurPersistence(float RefAlpha60, float FrameTime)
+{
+	RefAlpha60 = std::clamp(RefAlpha60, 0.0f, 0.999f);
+	if(RefAlpha60 <= 0.0f)
+		return 0.0f;
+	return std::pow(RefAlpha60, FrameTime * 60.0f);
+}
+
+#endif
+''')
+wr('src/game/client/components/bestclient/motion_blur_opengl.h', r'''/* Copyright © 2026 BestProject Team */
+#ifndef GAME_CLIENT_COMPONENTS_BESTCLIENT_MOTION_BLUR_OPENGL_H
+#define GAME_CLIENT_COMPONENTS_BESTCLIENT_MOTION_BLUR_OPENGL_H
+
+#include <engine/client/graphics_defines.h>
+
+#include <cstdint>
+
+struct SBcMotionBlurOpenGLState
+{
+	TWGLuint m_aTexture[2] = {0, 0};
+	uint32_t m_TexWidth = 0;
+	uint32_t m_TexHeight = 0;
+	int m_ReadIndex = 0;
+	bool m_HistoryValid = false;
+	bool m_EnabledLastFrame = false;
+	int64_t m_LastTime = 0;
+};
+
+#endif
+''')
+wr('src/game/client/components/bestclient/motion_blur_opengl.inl', r'''/* Copyright © 2026 BestProject Team */
+#include <cmath>
+
+#include <game/client/components/bestclient/motion_blur.h>
+
+void CCommandProcessorFragment_OpenGL3_3::EnsureMotionBlurTexture()
+{
+	SBcMotionBlurOpenGLState &State = m_MotionBlur;
+	if(State.m_aTexture[0] != 0 && State.m_aTexture[1] != 0 && State.m_TexWidth == m_CanvasWidth && State.m_TexHeight == m_CanvasHeight)
+		return;
+
+	DestroyMotionBlurTexture();
+
+	State.m_TexWidth = m_CanvasWidth;
+	State.m_TexHeight = m_CanvasHeight;
+
+	for(TWGLuint &Texture : State.m_aTexture)
+	{
+		glGenTextures(1, &Texture);
+		glBindTexture(GL_TEXTURE_2D, Texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, State.m_TexWidth, State.m_TexHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+	State.m_ReadIndex = 0;
+}
+
+void CCommandProcessorFragment_OpenGL3_3::DestroyMotionBlurTexture()
+{
+	SBcMotionBlurOpenGLState &State = m_MotionBlur;
+	for(TWGLuint &Texture : State.m_aTexture)
+	{
+		if(Texture != 0)
+			glDeleteTextures(1, &Texture);
+		Texture = 0;
+	}
+	State.m_TexWidth = 0;
+	State.m_TexHeight = 0;
+	State.m_ReadIndex = 0;
+	State.m_HistoryValid = false;
+	State.m_LastTime = 0;
+}
+
+void CCommandProcessorFragment_OpenGL3_3::RenderMotionBlurGL()
+{
+	SBcMotionBlurOpenGLState &State = m_MotionBlur;
+	const int ReadIndex = State.m_ReadIndex;
+	const int WriteIndex = 1 - ReadIndex;
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, State.m_aTexture[ReadIndex]);
+
+	if(!State.m_HistoryValid)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, State.m_TexWidth, State.m_TexHeight);
+		glBindTexture(GL_TEXTURE_2D, State.m_aTexture[WriteIndex]);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, State.m_TexWidth, State.m_TexHeight);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		State.m_HistoryValid = true;
+		return;
+	}
+
+	const float StrengthT = g_Config.m_BcMotionBlurStrength / 95.0f;
+	const float RefAlpha60 = StrengthT * StrengthT * 0.58f;
+	const float FrameTime = BcMotionBlurAdvanceFrameTime(State.m_LastTime);
+	const float BlendAlpha = BcMotionBlurPersistence(RefAlpha60, FrameTime);
+	if(BlendAlpha <= 0.0f)
+		return;
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, m_CanvasWidth, m_CanvasHeight);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	if(m_LastClipEnable)
+	{
+		glDisable(GL_SCISSOR_TEST);
+		m_LastClipEnable = false;
+	}
+
+	UseProgram(m_pPrimitiveProgramTextured);
+	const float aIdentityPos[8] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+	glUniformMatrix4x2fv(m_pPrimitiveProgramTextured->m_LocPos, 1, true, aIdentityPos);
+	m_pPrimitiveProgramTextured->m_LastScreenTL = vec2(0.0f, 0.0f);
+	m_pPrimitiveProgramTextured->m_LastScreenBR = vec2(0.0f, 0.0f);
+
+	glBindSampler(0, 0);
+	glBindTexture(GL_TEXTURE_2D, State.m_aTexture[ReadIndex]);
+	glUniform1i(m_pPrimitiveProgramTextured->m_LocTextureSampler, 0);
+	m_pPrimitiveProgramTextured->m_LastTextureSampler = -1;
+
+	const uint8_t Alpha = (uint8_t)std::round(BlendAlpha * 255.0f);
+	CCommandBuffer::SVertex aVertices[4];
+	aVertices[0].m_Pos = vec2(-1.0f, -1.0f);
+	aVertices[0].m_Tex = vec2(0.0f, 0.0f);
+	aVertices[1].m_Pos = vec2(1.0f, -1.0f);
+	aVertices[1].m_Tex = vec2(1.0f, 0.0f);
+	aVertices[2].m_Pos = vec2(1.0f, 1.0f);
+	aVertices[2].m_Tex = vec2(1.0f, 1.0f);
+	aVertices[3].m_Pos = vec2(-1.0f, 1.0f);
+	aVertices[3].m_Tex = vec2(0.0f, 1.0f);
+	for(auto &Vertex : aVertices)
+	{
+		Vertex.m_Color.r = 255;
+		Vertex.m_Color.g = 255;
+		Vertex.m_Color.b = 255;
+		Vertex.m_Color.a = Alpha;
+	}
+
+	UploadStreamBufferData(EPrimitiveType::QUADS, aVertices, sizeof(CCommandBuffer::SVertex), 1);
+	glBindVertexArray(m_aPrimitiveDrawVertexId[m_LastStreamBuffer]);
+	if(m_aLastIndexBufferBound[m_LastStreamBuffer] != m_QuadDrawIndexBufferId)
+	{
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_QuadDrawIndexBufferId);
+		m_aLastIndexBufferBound[m_LastStreamBuffer] = m_QuadDrawIndexBufferId;
+	}
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	m_LastStreamBuffer = (m_LastStreamBuffer + 1 >= MAX_STREAM_BUFFER_COUNT ? 0 : m_LastStreamBuffer + 1);
+
+	glBindTexture(GL_TEXTURE_2D, State.m_aTexture[WriteIndex]);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, State.m_TexWidth, State.m_TexHeight);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	State.m_ReadIndex = WriteIndex;
+
+	m_LastBlendMode = EBlendMode::NONE;
+}
+
+void CCommandProcessorFragment_OpenGL3_3::Cmd_BeforeSwap()
+{
+	SBcMotionBlurOpenGLState &State = m_MotionBlur;
+	const bool Enabled = BcMotionBlurEnabled();
+	if(Enabled != State.m_EnabledLastFrame)
+	{
+		State.m_HistoryValid = false;
+		State.m_LastTime = 0;
+		State.m_EnabledLastFrame = Enabled;
+	}
+	if(!Enabled || m_CanvasWidth == 0 || m_CanvasHeight == 0)
+		return;
+
+	EnsureMotionBlurTexture();
+	RenderMotionBlurGL();
+}
+''')
+wr('src/game/client/components/bestclient/motion_blur_vulkan_members.inl', r'''/* Copyright © 2026 BestProject Team */
+struct SFrameBlendImage
+{
+	VkImage m_Image = VK_NULL_HANDLE;
+	SMemoryImageBlock<IMAGE_BUFFER_CACHE_ID> m_ImgMem;
+	VkImageView m_ImgView = VK_NULL_HANDLE;
+	SDeviceDescriptorSet m_DescriptorSet;
+	bool m_Valid = false;
+};
+''')
+wr('src/game/client/components/bestclient/motion_blur_vulkan_state.inl', r'''/* Copyright © 2026 BestProject Team */
+std::vector<SFrameBlendImage> m_vFrameBlendImages;
+std::vector<VkCommandBuffer> m_vFrameBlendCommandBuffers;
+bool m_FrameBlendEnabledLastFrame = false;
+int64_t m_FrameBlendLastTime = 0;
+''')
+wr('src/game/client/components/bestclient/motion_blur_vulkan.inl', r'''/* Copyright © 2026 BestProject Team */
+void ResetFrameBlendHistory()
+{
+	for(auto &FrameBlendImage : m_vFrameBlendImages)
+		FrameBlendImage.m_Valid = false;
+	m_FrameBlendLastTime = 0;
+}
+
+[[nodiscard]] bool CreateFrameBlendDescriptorSet(SFrameBlendImage &FrameBlendImage)
+{
+	VkDescriptorPool DescriptorPool;
+	if(!GetDescriptorPoolForAlloc(DescriptorPool, m_StandardTextureDescrPool, &FrameBlendImage.m_DescriptorSet, 1))
+		return false;
+
+	VkDescriptorSetAllocateInfo DesAllocInfo{};
+	DesAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	DesAllocInfo.descriptorPool = DescriptorPool;
+	DesAllocInfo.descriptorSetCount = 1;
+	DesAllocInfo.pSetLayouts = &m_StandardTexturedDescriptorSetLayout;
+	if(vkAllocateDescriptorSets(m_VKDevice, &DesAllocInfo, &FrameBlendImage.m_DescriptorSet.m_Descriptor) != VK_SUCCESS)
+		return false;
+
+	VkDescriptorImageInfo ImageInfo{};
+	ImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ImageInfo.imageView = FrameBlendImage.m_ImgView;
+	ImageInfo.sampler = GetTextureSampler(SUPPORTED_SAMPLER_TYPE_CLAMP_TO_EDGE);
+
+	std::array<VkWriteDescriptorSet, 1> aDescriptorWrites{};
+	aDescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	aDescriptorWrites[0].dstSet = FrameBlendImage.m_DescriptorSet.m_Descriptor;
+	aDescriptorWrites[0].dstBinding = 0;
+	aDescriptorWrites[0].dstArrayElement = 0;
+	aDescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	aDescriptorWrites[0].descriptorCount = 1;
+	aDescriptorWrites[0].pImageInfo = &ImageInfo;
+
+	vkUpdateDescriptorSets(m_VKDevice, static_cast<uint32_t>(aDescriptorWrites.size()), aDescriptorWrites.data(), 0, nullptr);
+	return true;
+}
+
+[[nodiscard]] bool CreateFrameBlendImages()
+{
+	m_vFrameBlendImages.resize(m_SwapChainImageCount);
+
+	for(auto &FrameBlendImage : m_vFrameBlendImages)
+	{
+		if(!CreateImage(m_VKSwapImgAndViewportExtent.m_SwapImageViewport.width, m_VKSwapImgAndViewportExtent.m_SwapImageViewport.height, 1, 1, m_VKSurfFormat.format, VK_IMAGE_TILING_OPTIMAL, FrameBlendImage.m_Image, FrameBlendImage.m_ImgMem, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT))
+			return false;
+		FrameBlendImage.m_ImgView = CreateImageView(FrameBlendImage.m_Image, m_VKSurfFormat.format, VK_IMAGE_VIEW_TYPE_2D, 1, 1);
+		if(!ImageBarrier(FrameBlendImage.m_Image, 0, 1, 0, 1, m_VKSurfFormat.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL))
+			return false;
+		if(!ImageBarrier(FrameBlendImage.m_Image, 0, 1, 0, 1, m_VKSurfFormat.format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL))
+			return false;
+		if(!CreateFrameBlendDescriptorSet(FrameBlendImage))
+			return false;
+	}
+
+	ResetFrameBlendHistory();
+	m_FrameBlendEnabledLastFrame = false;
+	return true;
+}
+
+void DestroyFrameBlendImages()
+{
+	for(auto &FrameBlendImage : m_vFrameBlendImages)
+	{
+		if(FrameBlendImage.m_DescriptorSet.m_Descriptor != VK_NULL_HANDLE)
+			FreeDescriptorSetFromPool(FrameBlendImage.m_DescriptorSet);
+		if(FrameBlendImage.m_ImgView != VK_NULL_HANDLE)
+			vkDestroyImageView(m_VKDevice, FrameBlendImage.m_ImgView, nullptr);
+		if(FrameBlendImage.m_Image != VK_NULL_HANDLE)
+			vkDestroyImage(m_VKDevice, FrameBlendImage.m_Image, nullptr);
+		if(FrameBlendImage.m_ImgMem.m_BufferMem.m_Mem != VK_NULL_HANDLE)
+			FreeImageMemBlock(FrameBlendImage.m_ImgMem);
+	}
+
+	m_vFrameBlendImages.clear();
+	m_FrameBlendEnabledLastFrame = false;
+	m_FrameBlendLastTime = 0;
+}
+
+[[nodiscard]] bool FlushManualVertexBufferRange(const SDeviceMemoryBlock &BufferMem, size_t Offset, size_t DataSize)
+{
+	VkMappedMemoryRange MemRange{};
+	MemRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+	MemRange.memory = BufferMem.m_Mem;
+	MemRange.offset = Offset;
+	auto AlignmentMod = ((VkDeviceSize)DataSize % m_NonCoherentMemAlignment);
+	auto AlignmentReq = (m_NonCoherentMemAlignment - AlignmentMod);
+	if(AlignmentMod == 0)
+		AlignmentReq = 0;
+	MemRange.size = DataSize + AlignmentReq;
+	if(MemRange.offset + MemRange.size > BufferMem.m_Size)
+		MemRange.size = VK_WHOLE_SIZE;
+	return vkFlushMappedMemoryRanges(m_VKDevice, 1, &MemRange) == VK_SUCCESS;
+}
+
+void FrameBlendImageBarrier(VkCommandBuffer &CommandBuffer, VkImage Image, VkImageLayout OldLayout, VkImageLayout NewLayout)
+{
+	VkImageMemoryBarrier Barrier{};
+	Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	Barrier.oldLayout = OldLayout;
+	Barrier.newLayout = NewLayout;
+	Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	Barrier.image = Image;
+	Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	Barrier.subresourceRange.baseMipLevel = 0;
+	Barrier.subresourceRange.levelCount = 1;
+	Barrier.subresourceRange.baseArrayLayer = 0;
+	Barrier.subresourceRange.layerCount = 1;
+
+	VkPipelineStageFlags SourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	VkPipelineStageFlags DestinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+	if(OldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+	{
+		Barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		SourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		DestinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if(OldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else if(OldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR && NewLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+	{
+		Barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		SourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+		DestinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if(OldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+	{
+		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+		SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		DestinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+	}
+	else if(OldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL && NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	{
+		Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else
+	{
+		dbg_assert_failed("Unsupported frame blend layout transition. OldLayout=%d NewLayout=%d", (int)OldLayout, (int)NewLayout);
+	}
+
+	vkCmdPipelineBarrier(CommandBuffer, SourceStage, DestinationStage, 0, 0, nullptr, 0, nullptr, 1, &Barrier);
+}
+
+[[nodiscard]] bool RenderFrameBlend(VkCommandBuffer &MainCommandBuffer)
+{
+	if(m_vFrameBlendImages.empty() || m_LastPresentedSwapChainImageIndex == std::numeric_limits<decltype(m_LastPresentedSwapChainImageIndex)>::max())
+		return true;
+
+	auto &FrameBlendImage = m_vFrameBlendImages[m_LastPresentedSwapChainImageIndex];
+	if(!FrameBlendImage.m_Valid)
+		return true;
+
+	const float TotalBlendStrength = (g_Config.m_BcMotionBlurStrength / 95.0f) * 4.0f;
+	if(TotalBlendStrength <= 0.0f)
+		return true;
+	constexpr float MaxBlendAlphaPerPass = 0.85f;
+	const int RefPassCount = std::max(1, (int)std::ceil(TotalBlendStrength / MaxBlendAlphaPerPass));
+	const float RefAlphaPerPass = TotalBlendStrength / (float)RefPassCount;
+	const float RefAlpha60 = 1.0f - std::pow(1.0f - RefAlphaPerPass, RefPassCount);
+	const float FrameTime = BcMotionBlurAdvanceFrameTime(m_FrameBlendLastTime);
+	const float EffectiveAlpha = BcMotionBlurPersistence(RefAlpha60, FrameTime);
+	if(EffectiveAlpha <= 0.0f)
+		return true;
+
+	const int BlendPassCount = std::max(1, (int)std::ceil(std::log(1.0f - EffectiveAlpha) / std::log(1.0f - MaxBlendAlphaPerPass)));
+	const float BlendAlphaPerPass = 1.0f - std::pow(1.0f - EffectiveAlpha, 1.0f / (float)BlendPassCount);
+
+	const bool UseSecondaryCommandBuffer = m_ThreadCount > 1;
+	VkCommandBuffer CommandBuffer = MainCommandBuffer;
+	if(UseSecondaryCommandBuffer)
+	{
+		CommandBuffer = m_vFrameBlendCommandBuffers[m_CurImageIndex];
+		vkResetCommandBuffer(CommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+
+		VkCommandBufferInheritanceInfo InheritanceInfo{};
+		InheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+		InheritanceInfo.framebuffer = m_vFramebufferList[m_CurImageIndex];
+		InheritanceInfo.occlusionQueryEnable = VK_FALSE;
+		InheritanceInfo.renderPass = m_VKRenderPass;
+		InheritanceInfo.subpass = 0;
+
+		VkCommandBufferBeginInfo BeginInfo{};
+		BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+		BeginInfo.pInheritanceInfo = &InheritanceInfo;
+
+		if(vkBeginCommandBuffer(CommandBuffer, &BeginInfo) != VK_SUCCESS)
+		{
+			SetError(EGfxErrorType::GFX_ERROR_TYPE_RENDER_RECORDING, "Frame blend command buffer cannot be filled anymore.");
+			return false;
+		}
+	}
+
+	CCommandBuffer::SState State{};
+	State.m_BlendMode = EBlendMode::ALPHA;
+	State.m_WrapMode = EWrapMode::CLAMP;
+	State.m_Texture = 0;
+	State.m_ScreenTL = vec2(0.0f, 0.0f);
+	auto Viewport = m_VKSwapImgAndViewportExtent.GetPresentedImageViewport();
+	State.m_ScreenBR = vec2((float)Viewport.width, (float)Viewport.height);
+	State.m_ClipEnable = false;
+
+	SRenderCommandExecuteBuffer ExecBuffer{};
+	ExecBuffer.m_ThreadIndex = MAIN_THREAD_INDEX;
+	ExecBuffer.m_IndexBuffer = m_IndexBuffer;
+	ExecBufferFillDynamicStates(State, ExecBuffer);
+
+	bool IsTextured;
+	size_t BlendModeIndex;
+	size_t DynamicIndex;
+	size_t AddressModeIndex;
+	GetStateIndices(ExecBuffer, State, IsTextured, BlendModeIndex, DynamicIndex, AddressModeIndex);
+
+	auto &PipeLayout = GetStandardPipeLayout(false, true, BlendModeIndex, DynamicIndex);
+	auto &PipeLine = GetStandardPipe(false, true, BlendModeIndex, DynamicIndex);
+	vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipeLine);
+	if(ExecBuffer.m_HasDynamicState)
+	{
+		vkCmdSetViewport(CommandBuffer, 0, 1, &ExecBuffer.m_Viewport);
+		vkCmdSetScissor(CommandBuffer, 0, 1, &ExecBuffer.m_Scissor);
+	}
+
+	std::array<CCommandBuffer::SVertex, 4> aVertices{};
+	aVertices[0].m_Pos = vec2(0.0f, 0.0f);
+	aVertices[1].m_Pos = vec2((float)Viewport.width, 0.0f);
+	aVertices[2].m_Pos = vec2((float)Viewport.width, (float)Viewport.height);
+	aVertices[3].m_Pos = vec2(0.0f, (float)Viewport.height);
+	aVertices[0].m_Tex = vec2(0.0f, 0.0f);
+	aVertices[1].m_Tex = vec2(1.0f, 0.0f);
+	aVertices[2].m_Tex = vec2(1.0f, 1.0f);
+	aVertices[3].m_Tex = vec2(0.0f, 1.0f);
+	for(auto &Vertex : aVertices)
+	{
+		Vertex.m_Color.r = 255;
+		Vertex.m_Color.g = 255;
+		Vertex.m_Color.b = 255;
+		Vertex.m_Color.a = (uint8_t)std::round(BlendAlphaPerPass * 255.0f);
+	}
+
+	VkBuffer VKBuffer;
+	SDeviceMemoryBlock VKBufferMem;
+	size_t BufferOff = 0;
+	if(!CreateStreamVertexBuffer(MAIN_THREAD_INDEX, VKBuffer, VKBufferMem, BufferOff, aVertices.data(), sizeof(CCommandBuffer::SVertex) * aVertices.size()))
+		return false;
+	if(!FlushManualVertexBufferRange(VKBufferMem, BufferOff, sizeof(CCommandBuffer::SVertex) * aVertices.size()))
+		return false;
+
+	std::array<VkBuffer, 1> aVertexBuffers = {VKBuffer};
+	std::array<VkDeviceSize, 1> aOffsets = {(VkDeviceSize)BufferOff};
+	vkCmdBindVertexBuffers(CommandBuffer, 0, 1, aVertexBuffers.data(), aOffsets.data());
+	vkCmdBindIndexBuffer(CommandBuffer, ExecBuffer.m_IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+	std::array<float, 4 * 2> aMatrix;
+	GetStateMatrix(State, aMatrix);
+	vkCmdPushConstants(CommandBuffer, PipeLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(SUniformGPos), aMatrix.data());
+	vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, PipeLayout, 0, 1, &FrameBlendImage.m_DescriptorSet.m_Descriptor, 0, nullptr);
+	for(int Pass = 0; Pass < BlendPassCount; ++Pass)
+		vkCmdDrawIndexed(CommandBuffer, 6, 1, 0, 0, 0);
+
+	if(UseSecondaryCommandBuffer)
+	{
+		if(vkEndCommandBuffer(CommandBuffer) != VK_SUCCESS)
+		{
+			SetError(EGfxErrorType::GFX_ERROR_TYPE_RENDER_RECORDING, "Frame blend command buffer cannot be ended anymore.");
+			return false;
+		}
+		vkCmdExecuteCommands(MainCommandBuffer, 1, &CommandBuffer);
+	}
+
+	return true;
+}
+
+void CopyFrameToFrameBlendHistory(VkCommandBuffer &CommandBuffer)
+{
+	if(m_vFrameBlendImages.empty())
+		return;
+
+	auto &FrameBlendImage = m_vFrameBlendImages[m_CurImageIndex];
+	auto &SwapImage = m_vSwapChainImages[m_CurImageIndex];
+
+	FrameBlendImageBarrier(CommandBuffer, FrameBlendImage.m_Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	FrameBlendImageBarrier(CommandBuffer, SwapImage, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+	VkImageCopy Region{};
+	Region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	Region.srcSubresource.mipLevel = 0;
+	Region.srcSubresource.baseArrayLayer = 0;
+	Region.srcSubresource.layerCount = 1;
+	Region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	Region.dstSubresource.mipLevel = 0;
+	Region.dstSubresource.baseArrayLayer = 0;
+	Region.dstSubresource.layerCount = 1;
+	Region.extent.width = m_VKSwapImgAndViewportExtent.m_SwapImageViewport.width;
+	Region.extent.height = m_VKSwapImgAndViewportExtent.m_SwapImageViewport.height;
+	Region.extent.depth = 1;
+
+	vkCmdCopyImage(CommandBuffer, SwapImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, FrameBlendImage.m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Region);
+
+	FrameBlendImageBarrier(CommandBuffer, FrameBlendImage.m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	FrameBlendImageBarrier(CommandBuffer, SwapImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+	FrameBlendImage.m_Valid = true;
+}
+''')
+wr('src/game/client/components/bestclient/fx/fgf_weather.h', r'''/* Copyright © 2026 BestProject Team */
+#ifndef GAME_CLIENT_COMPONENTS_FGF_WEATHER_H
+#define GAME_CLIENT_COMPONENTS_FGF_WEATHER_H
+#include <base/color.h>
+#include <base/vmath.h>
+
+#include <engine/graphics.h>
+
+#include <game/client/component.h>
+#include "fgf_glow.h"
+
+// kernet-адаптация: в IGraphics старый MapScreenToWorld,
+// который пишет 4 числа во float*. Погода использует
+// собственный прямоугольник вида.
+struct CWeatherRect
+{
+	vec2 m_TopLeft{0.0f, 0.0f};
+	vec2 m_BottomRight{0.0f, 0.0f};
+};
+
+#include <vector>
+
+enum
+{
+	FGF_WEATHER_SNOW = 0,
+	FGF_WEATHER_RAIN,
+	FGF_WEATHER_FIREFLIES,
+	FGF_WEATHER_DUST,
+};
+
+class CFgfWeather : public CComponent
+{
+public:
+	int Sizeof() const override { return sizeof(*this); }
+	void OnInit() override;
+	void OnReset() override;
+	void OnRender() override;
+
+private:
+	static constexpr int MAX_DROPS = 1024;
+	static constexpr int MAX_SPLASHES = 256;
+
+	struct CDrop
+	{
+		vec2 m_Pos;
+		vec2 m_Vel;
+		float m_Life;
+		float m_LifeSpan;
+		float m_Size;
+		float m_Phase;
+		bool m_Settled;
+	};
+
+	struct CSplash
+	{
+		vec2 m_Pos;
+		vec2 m_Vel;
+		float m_Life;
+		float m_LifeSpan;
+		float m_Size;
+	};
+
+	IGraphics::CTextureHandle m_GlowTexture;
+
+	int m_Kind = FGF_WEATHER_SNOW;
+	CDrop m_aDrops[MAX_DROPS];
+	int m_NumDrops = 0;
+	CSplash m_aSplashes[MAX_SPLASHES];
+	int m_NumSplashes = 0;
+	float m_SpawnAccumulator = 0.0f;
+	float m_LastTime = 0.0f;
+
+	int m_MaskOriginX = 0;
+	int m_MaskOriginY = 0;
+	int m_MaskWidth = 0;
+	int m_MaskHeight = 0;
+	std::vector<unsigned char> m_Solid;
+	std::vector<int> m_AirTiles;
+	bool m_MaskReady = false;
+
+	CDrop *NewDrop();
+	void Splash(vec2 Pos);
+	void BuildMask(const CWeatherRect &View);
+	bool SolidAt(vec2 Pos) const;
+	bool RandomAirPoint(const CWeatherRect &View, vec2 &Pos) const;
+	void Spawn(const CWeatherRect &View, float Passed, float Time);
+	void Update(const CWeatherRect &View, float Passed, float Time);
+	void Draw(float Time);
+	void AmbientDust();
+};
+#endif
+''')
+wr('src/game/client/components/bestclient/fx/fgf_weather.cpp', r'''/* Copyright © 2026 BestProject Team */
+#include "fgf_weather.h"
+
+#include <base/math.h>
+
+#include <engine/shared/config.h>
+
+#include <base/time.h>
+
+#include <generated/client_data.h>
+
+#include <game/client/components/particles.h>
+#include <game/client/gameclient.h>
+#include <game/collision.h>
+#include <game/mapitems.h>
+
+#include <algorithm>
+#include <cmath>
+
+static constexpr float VIEW_MARGIN = 120.0f;
+
+	// kernet: MapScreenToWorld заполняет float* вместо CScreenRect.
+	CWeatherRect WeatherView(IGraphics *pGraphics, float CenterX, float CenterY, float Zoom)
+	{
+		float aPoints[4];
+		pGraphics->MapScreenToWorld(CenterX, CenterY, 100.0f, 100.0f, 100.0f,
+			0.0f, 0.0f, pGraphics->ScreenAspect(), Zoom, aPoints);
+		return {{aPoints[0], aPoints[1]}, {aPoints[2], aPoints[3]}};
+	}
+
+void CFgfWeather::OnInit()
+{
+	m_GlowTexture = FgfGlow::CreateGlowTexture(Graphics());
+}
+
+void CFgfWeather::OnReset()
+{
+	m_NumDrops = 0;
+	m_NumSplashes = 0;
+	m_SpawnAccumulator = 0.0f;
+	m_MaskReady = false;
+	m_Solid.clear();
+	m_AirTiles.clear();
+}
+
+void CFgfWeather::BuildMask(const CWeatherRect &View)
+{
+	const float Left = View.m_TopLeft.x - VIEW_MARGIN * 2.0f;
+	const float Right = View.m_BottomRight.x + VIEW_MARGIN * 2.0f;
+	const float Top = View.m_TopLeft.y - VIEW_MARGIN * 2.0f;
+	const float Bottom = View.m_BottomRight.y + VIEW_MARGIN * 2.0f;
+	const int X0 = std::max(0, std::min(round_to_int(Left), round_to_int(Right)) / 32);
+	const int Y0 = std::max(0, std::min(round_to_int(Top), round_to_int(Bottom)) / 32);
+	const int X1 = std::max(round_to_int(Left), round_to_int(Right)) / 32;
+	const int Y1 = std::max(round_to_int(Top), round_to_int(Bottom)) / 32;
+	const int Width = X1 - X0 + 1;
+	const int Height = Y1 - Y0 + 1;
+	if(Width <= 0 || Height <= 0 || Width > 400 || Height > 400)
+	{
+		m_MaskReady = false;
+		m_Solid.clear();
+		m_AirTiles.clear();
+		return;
+	}
+	if(m_MaskReady && m_MaskOriginX == X0 && m_MaskOriginY == Y0 && m_MaskWidth == Width && m_MaskHeight == Height)
+		return;
+
+	const float SpawnLeft = View.m_TopLeft.x - VIEW_MARGIN;
+	const float SpawnRight = View.m_BottomRight.x + VIEW_MARGIN;
+	const float SpawnTop = View.m_TopLeft.y - VIEW_MARGIN;
+	const float SpawnBottom = View.m_BottomRight.y + VIEW_MARGIN;
+
+	m_MaskOriginX = X0;
+	m_MaskOriginY = Y0;
+	m_MaskWidth = Width;
+	m_MaskHeight = Height;
+	m_Solid.assign((size_t)Width * Height, 0);
+	m_AirTiles.clear();
+	m_AirTiles.reserve((size_t)Width * Height / 2);
+
+	for(int y = 0; y < Height; y++)
+	{
+		for(int x = 0; x < Width; x++)
+		{
+			const int TileX = X0 + x;
+			const int TileY = Y0 + y;
+			const int Tile = Collision()->GetTile(TileX * 32 + 16, TileY * 32 + 16);
+			const bool Solid = Tile == TILE_SOLID || Tile == TILE_NOHOOK;
+			const int Index = y * Width + x;
+			m_Solid[Index] = Solid ? 1 : 0;
+			if(Solid)
+				continue;
+			const float TileLeft = TileX * 32.0f;
+			const float TileRight = TileLeft + 31.0f;
+			const float TileTop = TileY * 32.0f;
+			const float TileBottom = TileTop + 31.0f;
+			if(TileRight > SpawnLeft && TileLeft < SpawnRight && TileBottom > SpawnTop && TileTop < SpawnBottom)
+				m_AirTiles.push_back(Index);
+		}
+	}
+	m_MaskReady = true;
+}
+
+bool CFgfWeather::SolidAt(vec2 Pos) const
+{
+	if(!m_MaskReady)
+		return Collision()->CheckPoint(Pos);
+	const int TileX = round_to_int(Pos.x) / 32;
+	const int TileY = round_to_int(Pos.y) / 32;
+	const int LocalX = TileX - m_MaskOriginX;
+	const int LocalY = TileY - m_MaskOriginY;
+	if(LocalX < 0 || LocalY < 0 || LocalX >= m_MaskWidth || LocalY >= m_MaskHeight)
+		return Collision()->CheckPoint(Pos);
+	return m_Solid[LocalY * m_MaskWidth + LocalX] != 0;
+}
+
+bool CFgfWeather::RandomAirPoint(const CWeatherRect &View, vec2 &Pos) const
+{
+	if(m_AirTiles.empty())
+		return false;
+	const float SpawnLeft = View.m_TopLeft.x - VIEW_MARGIN;
+	const float SpawnRight = View.m_BottomRight.x + VIEW_MARGIN;
+	const float SpawnTop = View.m_TopLeft.y - VIEW_MARGIN;
+	const float SpawnBottom = View.m_BottomRight.y + VIEW_MARGIN;
+	const int Count = (int)m_AirTiles.size();
+	for(int Attempt = 0; Attempt < 8; Attempt++)
+	{
+		const int Index = m_AirTiles[std::min(Count - 1, (int)(random_float() * Count))];
+		const int TileX = m_MaskOriginX + Index % m_MaskWidth;
+		const int TileY = m_MaskOriginY + Index / m_MaskWidth;
+		const float Left = std::max(SpawnLeft, TileX * 32.0f);
+		const float Right = std::min(SpawnRight, TileX * 32.0f + 31.0f);
+		const float Top = std::max(SpawnTop, TileY * 32.0f);
+		const float Bottom = std::min(SpawnBottom, TileY * 32.0f + 31.0f);
+		if(Right <= Left || Bottom <= Top)
+			continue;
+		Pos = vec2(random_float(Left, Right), random_float(Top, Bottom));
+		if(!SolidAt(Pos))
+			return true;
+	}
+	return false;
+}
+
+CFgfWeather::CDrop *CFgfWeather::NewDrop()
+{
+	if(m_NumDrops >= MAX_DROPS)
+		return nullptr;
+	CDrop *pDrop = &m_aDrops[m_NumDrops++];
+	*pDrop = CDrop{};
+	return pDrop;
+}
+
+void CFgfWeather::Splash(vec2 Pos)
+{
+	const float Size = g_Config.m_BcWeatherRainSize / 100.0f;
+	const float Speed = g_Config.m_BcWeatherRainSpeed / 100.0f;
+	const int Count = 2 + (int)random_float(0.0f, 2.99f);
+	for(int i = 0; i < Count && m_NumSplashes < MAX_SPLASHES; i++)
+	{
+		CSplash &Splash = m_aSplashes[m_NumSplashes++];
+		Splash.m_Pos = Pos;
+		Splash.m_Vel = vec2(random_float(-70.0f, 70.0f), random_float(-120.0f, -50.0f)) * Speed;
+		Splash.m_Life = 0.0f;
+		Splash.m_LifeSpan = random_float(0.2f, 0.35f);
+		Splash.m_Size = random_float(2.0f, 3.2f) * Size;
+	}
+}
+
+void CFgfWeather::Spawn(const CWeatherRect &View, float Passed, float Time)
+{
+	const float Amount = g_Config.m_BcWeatherAmount / 100.0f;
+	const float Width = View.m_BottomRight.x - View.m_TopLeft.x + VIEW_MARGIN * 2.0f;
+	const float Height = View.m_BottomRight.y - View.m_TopLeft.y + VIEW_MARGIN * 2.0f;
+	const float Area = Width / 1400.0f;
+
+	if(m_Kind == FGF_WEATHER_FIREFLIES)
+	{
+		const float Size = g_Config.m_BcWeatherFireflySize / 100.0f;
+		const float Speed = g_Config.m_BcWeatherFireflySpeed / 100.0f;
+		const int Wanted = std::min(MAX_DROPS, (int)(24.0f * Amount * Area * Height / 800.0f));
+		for(int Tries = 0; m_NumDrops < Wanted && Tries < 8; Tries++)
+		{
+			const vec2 Pos(random_float(View.m_TopLeft.x - VIEW_MARGIN, View.m_BottomRight.x + VIEW_MARGIN),
+				random_float(View.m_TopLeft.y - VIEW_MARGIN, View.m_BottomRight.y + VIEW_MARGIN));
+			if(SolidAt(Pos))
+				continue;
+			CDrop *pDrop = NewDrop();
+			pDrop->m_Pos = Pos;
+			pDrop->m_Vel = direction(random_float(0.0f, 2.0f * pi)) * random_float(10.0f, 25.0f) * Speed;
+			pDrop->m_LifeSpan = random_float(5.0f, 10.0f);
+			pDrop->m_Size = random_float(0.8f, 1.2f) * Size;
+			pDrop->m_Phase = random_float(0.0f, 2.0f * pi);
+		}
+		return;
+	}
+
+	const bool Snow = m_Kind == FGF_WEATHER_SNOW;
+	const float Size = (Snow ? g_Config.m_BcWeatherSnowSize : g_Config.m_BcWeatherRainSize) / 100.0f;
+	const float Speed = (Snow ? g_Config.m_BcWeatherSnowSpeed : g_Config.m_BcWeatherRainSpeed) / 100.0f;
+	const float AverageLife = Snow ? 5.0f : 0.45f;
+	const float Wanted = (Snow ? 110.0f : 170.0f) * Amount * Area * Height / 800.0f;
+	m_SpawnAccumulator += Passed * Wanted / AverageLife;
+	if(m_MaskReady && m_AirTiles.empty())
+	{
+		m_SpawnAccumulator = 0.0f;
+		return;
+	}
+
+	const int TryLimit = m_MaskReady ? 48 : 400;
+	int Tries = 0;
+	while(m_SpawnAccumulator >= 1.0f && Tries < TryLimit)
+	{
+		Tries++;
+		vec2 Pos(random_float(View.m_TopLeft.x - VIEW_MARGIN, View.m_BottomRight.x + VIEW_MARGIN),
+			random_float(View.m_TopLeft.y - VIEW_MARGIN, View.m_BottomRight.y + VIEW_MARGIN));
+		if(SolidAt(Pos) && !RandomAirPoint(View, Pos))
+			continue;
+		m_SpawnAccumulator -= 1.0f;
+		CDrop *pDrop = NewDrop();
+		if(!pDrop)
+		{
+			m_SpawnAccumulator = 0.0f;
+			break;
+		}
+		pDrop->m_Pos = Pos;
+		pDrop->m_Phase = random_float(0.0f, 2.0f * pi);
+		if(Snow)
+		{
+			pDrop->m_Vel = vec2(random_float(-15.0f, 15.0f), random_float(35.0f, 70.0f)) * Speed;
+			pDrop->m_LifeSpan = random_float(3.0f, 7.0f);
+			pDrop->m_Size = random_float(3.0f, 7.0f) * Size;
+		}
+		else
+		{
+			const float Tilt = g_Config.m_BcWeatherRainTilt * (pi / 180.0f);
+			const float FallSpeed = random_float(850.0f, 1050.0f) * Speed;
+			pDrop->m_Vel = direction(pi / 2.0f - Tilt) * FallSpeed;
+			pDrop->m_LifeSpan = random_float(0.3f, 0.6f);
+			pDrop->m_Size = random_float(0.8f, 1.2f) * Size;
+		}
+	}
+	m_SpawnAccumulator = std::min(m_SpawnAccumulator, 5.0f);
+}
+
+void CFgfWeather::Update(const CWeatherRect &View, float Passed, float Time)
+{
+	const float Left = View.m_TopLeft.x - VIEW_MARGIN * 2.0f;
+	const float Right = View.m_BottomRight.x + VIEW_MARGIN * 2.0f;
+	const float Top = View.m_TopLeft.y - VIEW_MARGIN * 2.0f;
+	const float Bottom = View.m_BottomRight.y + VIEW_MARGIN * 2.0f;
+
+	for(int i = 0; i < m_NumDrops;)
+	{
+		CDrop &Drop = m_aDrops[i];
+		Drop.m_Life += Passed;
+		bool Dead = Drop.m_Life >= Drop.m_LifeSpan ||
+			    Drop.m_Pos.x < Left || Drop.m_Pos.x > Right || Drop.m_Pos.y < Top || Drop.m_Pos.y > Bottom;
+
+		if(!Dead && !Drop.m_Settled)
+		{
+			vec2 Vel = Drop.m_Vel;
+			if(m_Kind == FGF_WEATHER_SNOW)
+			{
+				const float Speed = g_Config.m_BcWeatherSnowSpeed / 100.0f;
+				Vel.x += std::sin(Time * 1.3f + Drop.m_Phase) * 25.0f * Speed;
+			}
+			else if(m_Kind == FGF_WEATHER_FIREFLIES)
+			{
+				const float SpeedScale = g_Config.m_BcWeatherFireflySpeed / 100.0f;
+				const float Turn = std::sin(Time * 0.7f + Drop.m_Phase * 3.0f) * 1.6f;
+				const float Speed = length(Drop.m_Vel);
+				Drop.m_Vel = direction(angle(Drop.m_Vel) + Turn * Passed) * Speed;
+				Vel = Drop.m_Vel + vec2(0.0f, std::sin(Time * 2.1f + Drop.m_Phase) * 8.0f * SpeedScale);
+			}
+
+			const vec2 Next = Drop.m_Pos + Vel * Passed;
+			if(SolidAt(Next))
+			{
+				if(m_Kind == FGF_WEATHER_RAIN)
+				{
+					vec2 Hit = Drop.m_Pos;
+					Collision()->IntersectLine(Drop.m_Pos, Next, &Hit, nullptr);
+					Splash(Hit - vec2(0.0f, 1.0f));
+					Dead = true;
+				}
+				else if(m_Kind == FGF_WEATHER_SNOW)
+				{
+					Drop.m_Settled = true;
+					Drop.m_LifeSpan = Drop.m_Life + random_float(1.5f, 3.0f);
+				}
+				else
+				{
+					Drop.m_Vel = -Drop.m_Vel;
+				}
+			}
+			else
+				Drop.m_Pos = Next;
+		}
+
+		if(Dead)
+		{
+			Drop = m_aDrops[--m_NumDrops];
+			continue;
+		}
+		i++;
+	}
+
+	for(int i = 0; i < m_NumSplashes;)
+	{
+		CSplash &Splash = m_aSplashes[i];
+		Splash.m_Life += Passed;
+		if(Splash.m_Life >= Splash.m_LifeSpan)
+		{
+			Splash = m_aSplashes[--m_NumSplashes];
+			continue;
+		}
+		Splash.m_Vel.y += 600.0f * Passed;
+		Splash.m_Pos += Splash.m_Vel * Passed;
+		i++;
+	}
+}
+
+static ColorRGBA WeatherColor(int Kind)
+{
+	unsigned Packed = g_Config.m_BcWeatherSnowColor;
+	if(Kind == FGF_WEATHER_RAIN)
+		Packed = g_Config.m_BcWeatherRainColor;
+	else if(Kind == FGF_WEATHER_FIREFLIES)
+		Packed = g_Config.m_BcWeatherFireflyColor;
+	return color_cast<ColorRGBA>(ColorHSLA(Packed));
+}
+
+void CFgfWeather::Draw(float Time)
+{
+	Graphics()->TextureSet(m_GlowTexture);
+	const ColorRGBA Color = WeatherColor(m_Kind);
+
+	if(m_Kind == FGF_WEATHER_FIREFLIES)
+	{
+		const ColorRGBA Core = FgfGlow::Whiten(Color, 0.55f);
+		Graphics()->BlendAdditive();
+		Graphics()->QuadsBegin();
+		Graphics()->QuadsSetRotation(0.0f);
+		for(int i = 0; i < m_NumDrops; i++)
+		{
+			const CDrop &Drop = m_aDrops[i];
+			const float Fade = std::min(1.0f, std::min(Drop.m_Life, Drop.m_LifeSpan - Drop.m_Life) / 1.0f);
+			const float Blink = std::pow(0.5f + 0.5f * std::sin(Time * 2.2f + Drop.m_Phase), 3.0f);
+			const float Alpha = Fade * mix(0.15f, 1.0f, Blink);
+			Graphics()->SetColor(Color.r, Color.g, Color.b, 0.45f * Alpha);
+			IGraphics::CQuadItem Glow(Drop.m_Pos.x, Drop.m_Pos.y, 30.0f * Drop.m_Size, 30.0f * Drop.m_Size);
+			Graphics()->QuadsDraw(&Glow, 1);
+			Graphics()->SetColor(Core.r, Core.g, Core.b, Alpha);
+			IGraphics::CQuadItem CoreQuad(Drop.m_Pos.x, Drop.m_Pos.y, 6.0f * Drop.m_Size, 6.0f * Drop.m_Size);
+			Graphics()->QuadsDraw(&CoreQuad, 1);
+		}
+		Graphics()->QuadsEnd();
+		Graphics()->BlendNormal();
+		return;
+	}
+
+	if(m_Kind == FGF_WEATHER_SNOW)
+	{
+		const IGraphics::CTextureHandle FlakeTexture = GameClient()->m_ExtrasSkin.m_SpriteParticleSnowflake;
+		const bool Sprite = g_Config.m_BcWeatherSnowflakes != 0 && GameClient()->m_ExtrasSkinLoaded && FlakeTexture.IsValid();
+		Graphics()->TextureSet(Sprite ? FlakeTexture : m_GlowTexture);
+		Graphics()->BlendNormal();
+		Graphics()->QuadsBegin();
+		Graphics()->QuadsSetSubset(0.0f, 0.0f, 1.0f, 1.0f);
+		for(int i = 0; i < m_NumDrops; i++)
+		{
+			const CDrop &Drop = m_aDrops[i];
+			const float Fade = std::clamp(std::min(Drop.m_Life / 0.5f, (Drop.m_LifeSpan - Drop.m_Life) / 1.0f), 0.0f, 1.0f);
+			const float Spin = Drop.m_Phase + Time * (Drop.m_Phase < pi ? 0.4f : -0.4f);
+			Graphics()->QuadsSetRotation(Sprite ? Spin : 0.0f);
+			Graphics()->SetColor(Color.r, Color.g, Color.b, 0.9f * Fade);
+			const float Size = Sprite ? Drop.m_Size * 3.4f : Drop.m_Size;
+			IGraphics::CQuadItem Flake(Drop.m_Pos.x, Drop.m_Pos.y, Size, Size);
+			Graphics()->QuadsDraw(&Flake, 1);
+		}
+		Graphics()->QuadsSetRotation(0.0f);
+		Graphics()->QuadsEnd();
+		return;
+	}
+
+	Graphics()->BlendNormal();
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < m_NumDrops; i++)
+	{
+		const CDrop &Drop = m_aDrops[i];
+		Graphics()->QuadsSetRotation(angle(Drop.m_Vel));
+		const float Fade = std::clamp(std::min(Drop.m_Life / 0.06f, (Drop.m_LifeSpan - Drop.m_Life) / 0.06f), 0.0f, 1.0f);
+		Graphics()->SetColor(Color.r, Color.g, Color.b, 0.55f * Drop.m_Size * Fade);
+		IGraphics::CQuadItem Streak(Drop.m_Pos.x, Drop.m_Pos.y, 26.0f * Drop.m_Size, 2.2f);
+		Graphics()->QuadsDraw(&Streak, 1);
+	}
+	Graphics()->QuadsSetRotation(0.0f);
+	const ColorRGBA SplashColor = FgfGlow::Whiten(Color, 0.45f);
+	for(int i = 0; i < m_NumSplashes; i++)
+	{
+		const CSplash &Splash = m_aSplashes[i];
+		const float Fade = 1.0f - Splash.m_Life / Splash.m_LifeSpan;
+		Graphics()->SetColor(SplashColor.r, SplashColor.g, SplashColor.b, 0.7f * Fade);
+		IGraphics::CQuadItem Droplet(Splash.m_Pos.x, Splash.m_Pos.y, Splash.m_Size, Splash.m_Size);
+		Graphics()->QuadsDraw(&Droplet, 1);
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CFgfWeather::AmbientDust()
+{
+	static int64_t s_LastUpdate = 0;
+	const int64_t Now = time_get();
+	const float Speed = 1.0f;
+	if((Now - s_LastUpdate) / (float)time_freq() * Speed <= 1.0f / 5.0f)
+		return;
+	s_LastUpdate = Now;
+
+	const vec2 Center = GameClient()->m_Camera.m_Center;
+	const CWeatherRect View = WeatherView(Graphics(), Center.x, Center.y,
+		GameClient()->m_Camera.m_Zoom);
+	const ColorRGBA Color = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_BcAmbientDustColor));
+	const int Amount = round_to_int(6.0f * g_Config.m_BcAmbientDustAmount / 100.0f);
+	const float Size = g_Config.m_BcWeatherDustSize / 100.0f;
+	const float DustSpeed = g_Config.m_BcWeatherDustSpeed / 100.0f;
+
+	for(int i = 0; i < Amount; i++)
+	{
+		const float LifeSpan = random_float(4.0f, 8.0f);
+		const bool Sparkle = (i % 4) == 0;
+
+		CParticle p;
+		p.SetDefault();
+		p.m_Spr = Sparkle ? SPRITE_PART_SPARKLE : SPRITE_PART_BALL;
+		p.m_Pos = vec2(random_float(View.m_TopLeft.x, View.m_BottomRight.x), random_float(View.m_TopLeft.y, View.m_BottomRight.y));
+		p.m_Vel = vec2(random_float(-14.0f, 14.0f), random_float(-18.0f, 6.0f)) * DustSpeed;
+		p.m_LifeSpan = LifeSpan;
+		p.m_StartSize = (Sparkle ? random_float(8.0f, 16.0f) : random_float(5.0f, 14.0f)) * Size;
+		p.m_EndSize = 0.0f;
+		p.m_Rot = random_angle();
+		p.m_Rotspeed = random_float(-0.2f, 0.2f) * DustSpeed;
+		p.m_Gravity = random_float(-4.0f, 2.0f) * DustSpeed;
+		p.m_Friction = 1.0f;
+		p.m_UseAlphaFading = true;
+		p.m_StartAlpha = 0.5f;
+		p.m_EndAlpha = 0.0f;
+		p.m_Collides = false;
+		p.m_Color = Color;
+		GameClient()->m_Particles.Add(Sparkle ? CParticles::GROUP_TRAIL_EXTRA : CParticles::GROUP_PROJECTILE_TRAIL, &p, random_float(0.0f, LifeSpan));
+	}
+}
+
+void CFgfWeather::OnRender()
+{
+	if(Client()->State() != IClient::STATE_ONLINE && Client()->State() != IClient::STATE_DEMOPLAYBACK)
+		return;
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects)
+		return;
+
+	const float Time = LocalTime();
+	const float Passed = std::clamp(Time - m_LastTime, 0.0f, 0.1f) * 1.0f;
+	m_LastTime = Time;
+
+	if(!g_Config.m_BcAtmosphere)
+	{
+		if(m_NumDrops != 0 || m_NumSplashes != 0)
+			OnReset();
+		return;
+	}
+
+	const int Kind = std::clamp(g_Config.m_BcWeather, 0, (int)FGF_WEATHER_DUST);
+	if(Kind != m_Kind)
+	{
+		m_Kind = Kind;
+		OnReset();
+	}
+	if(m_Kind == FGF_WEATHER_DUST)
+	{
+		AmbientDust();
+		return;
+	}
+
+	const vec2 Center = GameClient()->m_Camera.m_Center;
+	const CWeatherRect View = WeatherView(Graphics(), Center.x, Center.y,
+		GameClient()->m_Camera.m_Zoom);
+
+	BuildMask(View);
+	Spawn(View, Passed, Time);
+	Update(View, Passed, Time);
+	Draw(Time);
+}
+''')
+wr('src/game/client/components/bestclient/fx/fgf_glow.h', r'''/* Погода melancholy (порт BestClient @ 81ca85f, fx/fgf_glow.*):
+   обрезанная копия — оставлено только то, что использует CFgfWeather
+   (CreateGlowTexture + Whiten). */
+#ifndef GAME_CLIENT_COMPONENTS_BESTCLIENT_FX_FGF_GLOW_H
+#define GAME_CLIENT_COMPONENTS_BESTCLIENT_FX_FGF_GLOW_H
+#include <base/color.h>
+#include <base/vmath.h>
+
+#include <engine/graphics.h>
+
+namespace FgfGlow
+{
+        IGraphics::CTextureHandle CreateGlowTexture(IGraphics *pGraphics);
+        ColorRGBA Whiten(ColorRGBA Color, float Amount);
+}
+#endif
+''')
+wr('src/game/client/components/bestclient/fx/fgf_glow.cpp', r'''#include "fgf_glow.h"
+
+#include <base/math.h>
+
+#include <engine/image.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+
+static float GlowFalloff(float Distance)
+{
+        if(Distance >= 1.0f)
+                return 0.0f;
+        const float Inv = 1.0f - Distance;
+        return Inv * Inv * (0.35f + 0.65f * Inv);
+}
+
+static float GlowAlpha(float Dx, float Dy)
+{
+        return GlowFalloff(std::sqrt(Dx * Dx + Dy * Dy));
+}
+
+namespace
+{
+        struct CSharedTextures
+        {
+                IGraphics *m_pGraphics = nullptr;
+                IGraphics::CTextureHandle m_Glow;
+        };
+
+        CSharedTextures s_SharedTextures;
+
+        void BindGraphics(IGraphics *pGraphics)
+        {
+                if(s_SharedTextures.m_pGraphics == pGraphics)
+                        return;
+                s_SharedTextures = {};
+                s_SharedTextures.m_pGraphics = pGraphics;
+        }
+}
+
+// kernet-адаптация: у CImageInfo нет Allocate() — выделяем malloc-ом,
+// как image_loader.cpp; LoadTextureRawMove забирает владение и делает
+// CImageInfo::Free() (free), так что пара malloc/free сходится.
+static IGraphics::CTextureHandle CreateTexture(IGraphics *pGraphics, int Width, int Height, float (*pAlpha)(float Dx, float Dy), const char *pName)
+{
+        CImageInfo Image;
+        Image.m_Width = Width;
+        Image.m_Height = Height;
+        Image.m_Format = CImageInfo::FORMAT_RGBA;
+        Image.m_pData = static_cast<uint8_t *>(malloc(static_cast<size_t>(Width) * Height * 4));
+        for(int y = 0; y < Height; y++)
+        {
+                for(int x = 0; x < Width; x++)
+                {
+                        const float Dx = (x + 0.5f) / Width * 2.0f - 1.0f;
+                        const float Dy = (y + 0.5f) / Height * 2.0f - 1.0f;
+                        uint8_t *pPixel = &Image.m_pData[(y * Width + x) * 4];
+                        pPixel[0] = 255;
+                        pPixel[1] = 255;
+                        pPixel[2] = 255;
+                        pPixel[3] = (uint8_t)std::clamp(round_to_int(pAlpha(Dx, Dy) * 255.0f), 0, 255);
+                }
+        }
+        return pGraphics->LoadTextureRawMove(Image, 0, pName);
+}
+
+IGraphics::CTextureHandle FgfGlow::CreateGlowTexture(IGraphics *pGraphics)
+{
+        BindGraphics(pGraphics);
+        if(!s_SharedTextures.m_Glow.IsValid())
+                s_SharedTextures.m_Glow = CreateTexture(pGraphics, 64, 64, GlowAlpha, "fgf_glow");
+        return s_SharedTextures.m_Glow;
+}
+
+ColorRGBA FgfGlow::Whiten(ColorRGBA Color, float Amount)
+{
+        return ColorRGBA(mix(Color.r, 1.0f, Amount), mix(Color.g, 1.0f, Amount), mix(Color.b, 1.0f, Amount), 1.0f);
+}
+''')
+sub('src/engine/shared/config_variables.h', r'''MACRO_CONFIG_INT(ClPlusFlyBot, cl_plus_flybot, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable fly bot")
+''', r'''MACRO_CONFIG_INT(ClPlusFlyBot, cl_plus_flybot, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable fly bot")
+// Погода (BestClient @ 81ca85f, config_variables_bestclient.h:606-625)
+MACRO_CONFIG_INT(BcAtmosphere, bc_atmosphere, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Weather around you")
+MACRO_CONFIG_INT(BcWeather, bc_weather, 0, 0, 3, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Weather type (0 = snow, 1 = rain, 2 = fireflies, 3 = dust)")
+MACRO_CONFIG_INT(BcWeatherAmount, bc_weather_amount, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Amount of weather in percent")
+MACRO_CONFIG_INT(BcWeatherSnowSize, bc_weather_snow_size, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of snow particles in percent")
+MACRO_CONFIG_INT(BcWeatherSnowSpeed, bc_weather_snow_speed, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of snow particles in percent")
+MACRO_CONFIG_COL(BcWeatherSnowColor, bc_weather_snow_color, 255, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Color of the snow")
+MACRO_CONFIG_INT(BcWeatherSnowflakes, bc_weather_snowflakes, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Snow look (0 = dots, 1 = snowflakes)")
+MACRO_CONFIG_INT(BcWeatherRainSize, bc_weather_rain_size, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of rain streaks in percent")
+MACRO_CONFIG_INT(BcWeatherRainSpeed, bc_weather_rain_speed, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of rain in percent")
+MACRO_CONFIG_INT(BcWeatherRainTilt, bc_weather_rain_tilt, 5, -75, 75, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Rain tilt from vertical in degrees")
+MACRO_CONFIG_COL(BcWeatherRainColor, bc_weather_rain_color, 10063569, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Color of the rain")
+MACRO_CONFIG_INT(BcWeatherFireflySize, bc_weather_firefly_size, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of fireflies in percent")
+MACRO_CONFIG_INT(BcWeatherFireflySpeed, bc_weather_firefly_speed, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of fireflies in percent")
+MACRO_CONFIG_COL(BcWeatherFireflyColor, bc_weather_firefly_color, 3791782, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Color of the fireflies")
+MACRO_CONFIG_INT(BcAmbientDust, bc_ambient_dust, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Drift motes of dust through the world for atmosphere")
+MACRO_CONFIG_COL(BcAmbientDustColor, bc_ambient_dust_color, 1981660, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Color of the ambient dust motes")
+MACRO_CONFIG_INT(BcAmbientDustAmount, bc_ambient_dust_amount, 100, 25, 200, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Amount of ambient dust motes in percent")
+MACRO_CONFIG_INT(BcWeatherDustSize, bc_weather_dust_size, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Size of dust motes in percent")
+MACRO_CONFIG_INT(BcWeatherDustSpeed, bc_weather_dust_speed, 100, 25, 300, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Speed of dust motes in percent")
+// Моушен блюр (BestClient @ 81ca85f, config_variables_bestclient.h:417-418)
+MACRO_CONFIG_INT(BcMotionBlur, bc_motion_blur, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable motion blur via previous-frame blending")
+MACRO_CONFIG_INT(BcMotionBlurStrength, bc_motion_blur_strength, 50, 0, 95, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Strength of motion blur frame blending (0-95%)")
+// Фокус режим (BestClient @ 81ca85f, config_variables_bestclient.h:504-513)
+MACRO_CONFIG_INT(ClFocusMode, p_focus_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable focus mode to minimize visual distractions")
+MACRO_CONFIG_INT(ClFocusModeHideNames, p_focus_mode_hide_names, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide player names in focus mode")
+MACRO_CONFIG_INT(ClFocusModeHideEffects, p_focus_mode_hide_effects, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide visual effects in focus mode")
+MACRO_CONFIG_INT(ClFocusModeHideHud, p_focus_mode_hide_hud, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide HUD in focus mode")
+MACRO_CONFIG_INT(ClFocusModeHideUI, p_focus_mode_hide_ui, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide unnecessary UI elements in focus mode")
+MACRO_CONFIG_INT(ClFocusModeHideChat, p_focus_mode_hide_chat, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide chat in focus mode")
+MACRO_CONFIG_INT(ClFocusModeHideScoreboard, p_focus_mode_hide_scoreboard, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Hide scoreboard in focus mode")
+MACRO_CONFIG_INT(ClFocusModeAutoReply, p_focus_mode_auto_reply, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Auto reply to pings when focus mode hides chat")
+MACRO_CONFIG_STR(ClFocusModeAutoReplyMessage, p_focus_mode_auto_reply_message, 128, "my chat is hidden", CFGFLAG_CLIENT | CFGFLAG_SAVE, "Message to auto reply when focus mode hides chat")
+''', 'config_variables.h: Погода + Моушен блюр + Фокус режим (31 конфиг BestClient)')
+sub('src/engine/client/backend/opengl/backend_opengl.h', r'''dbg_assert_failed("Call of unsupported Cmd_RenderTex3D");
+	}
+''', r'''dbg_assert_failed("Call of unsupported Cmd_RenderTex3D");
+	}
+	// melancholy: хук перед свопом (моушен блюр, BestClient @ 81ca85f)
+	virtual void Cmd_BeforeSwap() {}
+''', 'backend_opengl.h: virtual Cmd_BeforeSwap')
+sub('src/engine/client/backend/opengl/backend_opengl3.h', r'''#include "backend_opengl.h"
+''', r'''#include "backend_opengl.h"
+
+// melancholy
+#include <game/client/components/bestclient/motion_blur_opengl.h>
+// melancholy
+''', 'backend_opengl3.h: include motion_blur_opengl.h')
+sub('src/engine/client/backend/opengl/backend_opengl3.h', r'''void TextureUpdate(int Slot, int X, int Y, int Width, int Height, int GLFormat, uint8_t *pTexData);
+''', r'''void TextureUpdate(int Slot, int X, int Y, int Width, int Height, int GLFormat, uint8_t *pTexData);
+
+	// melancholy
+	SBcMotionBlurOpenGLState m_MotionBlur;
+	void EnsureMotionBlurTexture();
+	void DestroyMotionBlurTexture();
+	void RenderMotionBlurGL();
+	// melancholy
+''', 'backend_opengl3.h: состояние и методы моушен-блюра')
+sub('src/engine/client/backend/opengl/backend_opengl3.h', r'''void Cmd_RenderQuadContainerAsSpriteMultiple(const CCommandBuffer::SCommand_RenderQuadContainerAsSpriteMultiple *pCommand) override;
+
+public:
+''', r'''void Cmd_RenderQuadContainerAsSpriteMultiple(const CCommandBuffer::SCommand_RenderQuadContainerAsSpriteMultiple *pCommand) override;
+
+
+	// melancholy
+	void Cmd_BeforeSwap() override;
+	// melancholy
+
+	public:
+''', 'backend_opengl3.h: Cmd_BeforeSwap override')
+sub('src/engine/client/backend/opengl/backend_opengl3.cpp', r'''		RenderOffset += RSPCount;
+		DrawCount -= RSPCount;
+	}
+}
+
+#endif''', r'''		RenderOffset += RSPCount;
+		DrawCount -= RSPCount;
+	}
+}
+
+// melancholy
+#include <game/client/components/bestclient/motion_blur_opengl.inl>
+// melancholy
+
+#endif''', 'backend_opengl3.cpp: include motion_blur_opengl.inl')
+sub('src/engine/client/backend/opengl/backend_opengl.cpp', r'''	case CCommandBuffer::CMD_POST_PROCESS:
+		Cmd_PostProcess(static_cast<const CCommandBuffer::SCommand_PostProcess *>(
+			pBaseCommand));
+		break;
+	default:
+		return ERunCommandReturnTypes::RUN_COMMAND_COMMAND_UNHANDLED;
+	}
+
+	return ERunCommandReturnTypes::RUN_COMMAND_COMMAND_HANDLED;
+}
+
+// ------------ CCommandProcessorFragment_OpenGL2''', r'''	case CCommandBuffer::CMD_POST_PROCESS:
+		Cmd_PostProcess(static_cast<const CCommandBuffer::SCommand_PostProcess *>(
+			pBaseCommand));
+		break;
+	// melancholy
+	case CCommandBuffer::CMD_SWAP:
+		Cmd_BeforeSwap();
+		return ERunCommandReturnTypes::RUN_COMMAND_COMMAND_UNHANDLED;
+	// melancholy
+
+	default:
+		return ERunCommandReturnTypes::RUN_COMMAND_COMMAND_UNHANDLED;
+	}
+
+	return ERunCommandReturnTypes::RUN_COMMAND_COMMAND_HANDLED;
+}
+
+// ------------ CCommandProcessorFragment_OpenGL2''', 'backend_opengl.cpp: CMD_SWAP -> Cmd_BeforeSwap (UNHANDLED, своп делает SDL-фрагмент)')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''#include <engine/shared/config.h>
+''', r'''#include <engine/shared/config.h>
+
+// melancholy
+#include <game/client/components/bestclient/motion_blur.h>
+// melancholy
+''', 'backend_vulkan.cpp: include motion_blur.h')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''struct SSwapChainMultiSampleImage
+	{
+		VkImage m_Image = VK_NULL_HANDLE;
+		SMemoryImageBlock<IMAGE_BUFFER_CACHE_ID> m_ImgMem;
+		VkImageView m_ImgView = VK_NULL_HANDLE;
+	};
+''', r'''struct SSwapChainMultiSampleImage
+	{
+		VkImage m_Image = VK_NULL_HANDLE;
+		SMemoryImageBlock<IMAGE_BUFFER_CACHE_ID> m_ImgMem;
+		VkImageView m_ImgView = VK_NULL_HANDLE;
+	};
+
+	// melancholy
+#include <game/client/components/bestclient/motion_blur_vulkan_members.inl>
+	// melancholy
+''', 'backend_vulkan.cpp: motion_blur_vulkan_members.inl')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''std::vector<SSwapChainMultiSampleImage> m_vSwapChainMultiSamplingImages;
+	std::vector<VkFramebuffer> m_vFramebufferList;''', r'''std::vector<SSwapChainMultiSampleImage> m_vSwapChainMultiSamplingImages;
+		// melancholy
+#include <game/client/components/bestclient/motion_blur_vulkan_state.inl>
+	// melancholy
+	std::vector<VkFramebuffer> m_vFramebufferList;''', 'backend_vulkan.cpp: motion_blur_vulkan_state.inl')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''vkCmdEndRenderPass(CommandBuffer);
+
+		if(vkEndCommandBuffer(CommandBuffer) != VK_SUCCESS)''', r'''vkCmdEndRenderPass(CommandBuffer);
+
+		// melancholy
+		const bool FrameBlendEnabled = BcMotionBlurEnabled();
+		if(FrameBlendEnabled != m_FrameBlendEnabledLastFrame)
+		{
+			ResetFrameBlendHistory();
+			m_FrameBlendEnabledLastFrame = FrameBlendEnabled;
+		}
+		if(FrameBlendEnabled && !RenderFrameBlend(CommandBuffer))
+			return false;
+		// melancholy
+
+		// melancholy
+		if(FrameBlendEnabled)
+			CopyFrameToFrameBlendHistory(CommandBuffer);
+		// melancholy
+
+
+		if(vkEndCommandBuffer(CommandBuffer) != VK_SUCCESS)''', 'backend_vulkan.cpp: RenderFrameBlend до end pass, копия истории после')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''if(vkBeginCommandBuffer(CommandBuffer, &BeginInfo) != VK_SUCCESS)
+		{
+			SetError(EGfxErrorType::GFX_ERROR_TYPE_RENDER_RECORDING, "Command buffer cannot be filled anymore.");
+			return false;
+		}
+
+		VkRenderPassBeginInfo RenderPassInfo{};''', r'''if(vkBeginCommandBuffer(CommandBuffer, &BeginInfo) != VK_SUCCESS)
+		{
+			SetError(EGfxErrorType::GFX_ERROR_TYPE_RENDER_RECORDING, "Command buffer cannot be filled anymore.");
+			return false;
+		}
+
+				// melancholy
+		if(BcMotionBlurEnabled() && m_LastPresentedSwapChainImageIndex != std::numeric_limits<decltype(m_LastPresentedSwapChainImageIndex)>::max() && m_LastPresentedSwapChainImageIndex != m_CurImageIndex)
+		{
+			auto &HistoryImage = m_vFrameBlendImages[m_LastPresentedSwapChainImageIndex];
+			if(HistoryImage.m_Valid)
+				FrameBlendImageBarrier(CommandBuffer, HistoryImage.m_Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+		// melancholy
+
+VkRenderPassBeginInfo RenderPassInfo{};''', 'backend_vulkan.cpp: барьер истории кадра перед render pass')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''SetError(EGfxErrorType::GFX_ERROR_TYPE_INIT, "Allocating thread command buffers failed.");
+					return false;
+				}
+			}
+		}
+''', r'''SetError(EGfxErrorType::GFX_ERROR_TYPE_INIT, "Allocating thread command buffers failed.");
+					return false;
+				}
+
+
+			// melancholy
+			m_vFrameBlendCommandBuffers.resize(m_SwapChainImageCount);
+			AllocInfo.commandPool = m_vCommandPools[0];
+			AllocInfo.commandBufferCount = (uint32_t)m_vFrameBlendCommandBuffers.size();
+			AllocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+			if(vkAllocateCommandBuffers(m_VKDevice, &AllocInfo, m_vFrameBlendCommandBuffers.data()) != VK_SUCCESS)
+			{
+				SetError(EGfxErrorType::GFX_ERROR_TYPE_INIT, "Allocating frame blend command buffers failed.");
+				return false;
+			}
+			// melancholy
+		}
+''', 'backend_vulkan.cpp: аллокация secondary-буферов frame blend')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''vkFreeCommandBuffers(m_VKDevice, m_vCommandPools[Count], static_cast<uint32_t>(ThreadDrawCommandBuffers.size()), ThreadDrawCommandBuffers.data());
+				++Count;
+			}
+		}
+''', r'''vkFreeCommandBuffers(m_VKDevice, m_vCommandPools[Count], static_cast<uint32_t>(ThreadDrawCommandBuffers.size()), ThreadDrawCommandBuffers.data());
+				++Count;
+			}
+			// melancholy
+			vkFreeCommandBuffers(m_VKDevice, m_vCommandPools[0], static_cast<uint32_t>(m_vFrameBlendCommandBuffers.size()), m_vFrameBlendCommandBuffers.data());
+			// melancholy
+		}
+''', 'backend_vulkan.cpp: освобождение secondary-буферов frame blend')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''		m_vHelperThreadDrawCommandBuffers.clear();
+''', r'''		m_vHelperThreadDrawCommandBuffers.clear();
+		// melancholy
+		m_vFrameBlendCommandBuffers.clear();
+		// melancholy
+''', 'backend_vulkan.cpp: очистка m_vFrameBlendCommandBuffers')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''		DestroyFramebuffers();
+
+		DestroyRenderPass();
+''', r'''		DestroyFramebuffers();
+
+		DestroyRenderPass();
+
+		// melancholy
+		DestroyFrameBlendImages();
+		// melancholy
+''', 'backend_vulkan.cpp: DestroyFrameBlendImages в cleanup swap chain')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''		if(!m_SwapchainCreated)
+			Ret = InitVulkanSwapChain(OldSwapChain);
+
+		if(OldSwapChainImageCount != m_SwapChainImageCount)''', r'''		if(!m_SwapchainCreated)
+			Ret = InitVulkanSwapChain(OldSwapChain);
+
+
+		// melancholy
+		if(Ret == 0 && OldSwapChainImageCount == m_SwapChainImageCount)
+		{
+			if(!CreateFrameBlendImages())
+				Ret = -1;
+		}
+		// melancholy
+		if(OldSwapChainImageCount != m_SwapChainImageCount)''', 'backend_vulkan.cpp: пересоздание frame blend при recreate swap chain')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''			if(!CreateTextureSamplers())
+				return -1;
+		}
+
+		m_vStreamedVertexBuffers.resize(m_ThreadCount);''', r'''			if(!CreateTextureSamplers())
+				return -1;
+		}
+
+
+
+		// melancholy
+		if(!CreateFrameBlendImages())
+			return -1;
+		// melancholy
+		m_vStreamedVertexBuffers.resize(m_ThreadCount);''', 'backend_vulkan.cpp: CreateFrameBlendImages при первой инициализации')
+sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''m_vSwapChainMultiSamplingImages.clear();
+	}
+
+	[[nodiscard]] bool CreateRenderPass(bool ClearAttachments)''', r'''m_vSwapChainMultiSamplingImages.clear();
+	}
+
+	[[nodiscard]] 	// melancholy
+#include <game/client/components/bestclient/motion_blur_vulkan.inl>
+	// melancholy
+
+	bool CreateRenderPass(bool ClearAttachments)''', 'backend_vulkan.cpp: include motion_blur_vulkan.inl (методы frame blend)')
+sub('src/game/client/gameclient.h', r'''#include "components/background.h"
+''', r'''#include "components/background.h"
+#include "components/bestclient/fx/fgf_weather.h" // melancholy: погода (BestClient @ 81ca85f)
+''', 'gameclient.h: include bestclient/fx/fgf_weather.h')
+sub('src/game/client/gameclient.h', r'''	CPet m_Pet;
+''', r'''	CPet m_Pet;
+	// Melancholy v1.1.11: погода (BestClient @ 81ca85f)
+	CFgfWeather m_FgfWeather;
+''', 'gameclient.h: CFgfWeather m_FgfWeather')
+sub('src/game/client/gameclient.cpp', r'''			&m_Pet, // TClient
+''', r'''			&m_Pet, // TClient
+			&m_FgfWeather, // Melancholy: погода (BestClient @ 81ca85f)
+''', 'gameclient.cpp: регистрация компонента погоды')
+sub('src/game/client/components/chat.cpp', r'''#if defined(CONF_VIDEORECORDER)
+	if(!((g_Config.m_ClShowChat && !IVideo::Current()) || (g_Config.m_ClVideoShowChat && IVideo::Current())))
+#else
+	if(!g_Config.m_ClShowChat)
+#endif
+		return;
+
+	y -= ScaledFontSize;''', r'''#if defined(CONF_VIDEORECORDER)
+	if(!((g_Config.m_ClShowChat && !IVideo::Current()) || (g_Config.m_ClVideoShowChat && IVideo::Current())))
+#else
+	if(!g_Config.m_ClShowChat)
+#endif
+		return;
+
+	// melancholy: фокус-режим прячет чат (BestClient @ 81ca85f)
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideChat)
+		return;
+
+	y -= ScaledFontSize;''', 'chat.cpp: фокус-режим прячет чат')
+sub('src/game/client/components/scoreboard.cpp', r'''	if(!IsActive())
+	{
+		// lock mouse if scoreboard was opened by being dead or game pause
+		if(m_MouseUnlocked)
+		{
+			LockMouse();
+		}
+		return;
+	}
+''', r'''	if(!IsActive())
+	{
+		// lock mouse if scoreboard was opened by being dead or game pause
+		if(m_MouseUnlocked)
+		{
+			LockMouse();
+		}
+		return;
+	}
+
+	// melancholy: фокус-режим прячет таблицу счёта (BestClient @ 81ca85f)
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideScoreboard)
+	{
+		if(m_MouseUnlocked)
+			LockMouse();
+		return;
+	}
+''', 'scoreboard.cpp: фокус-режим прячет таблицу счёта')
+sub('src/game/client/components/nameplates.cpp', r'''void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *pPlayerInfo, float Alpha)
+{
+''', r'''void CNamePlates::RenderNamePlateGame(vec2 Position, const CNetObj_PlayerInfo *pPlayerInfo, float Alpha)
+{
+	// melancholy: фокус-режим прячет ники игроков (BestClient @ 81ca85f)
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideNames)
+		return;
+''', 'nameplates.cpp: фокус-режим прячет ники')
+sub('src/game/client/components/effects.cpp', r'''void CEffects::AirJump(vec2 Pos, float Alpha, float Volume)
+{
+''', r'''void CEffects::AirJump(vec2 Pos, float Alpha, float Volume)
+{
+	// melancholy: фокус-режим прячет эффекты (BestClient @ 81ca85f), звук остаётся
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects)
+	{
+		if(g_Config.m_SndGame)
+			GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_PLAYER_AIRJUMP, Volume, Pos);
+		return;
+	}
+''', 'effects.cpp: AirJump — guard фокус-режима')
+sub('src/game/client/components/effects.cpp', r'''void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume)
+{
+''', r'''void CEffects::HammerHit(vec2 Pos, float Alpha, float Volume)
+{
+	// melancholy: фокус-режим прячет эффекты (BestClient @ 81ca85f), звук остаётся
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects)
+	{
+		if(g_Config.m_SndGame)
+			GameClient()->m_Sounds.PlayAt(CSounds::CHN_WORLD, SOUND_HAMMER_HIT, Volume, Pos);
+		return;
+	}
+''', 'effects.cpp: HammerHit — guard фокус-режима')
+sub('src/game/client/components/effects.cpp', r'''void CEffects::FreezingFlakes(vec2 Pos, vec2 Size, float Alpha)
+{
+''', r'''void CEffects::FreezingFlakes(vec2 Pos, vec2 Size, float Alpha)
+{
+	// melancholy: фокус-режим прячет эффекты (BestClient @ 81ca85f)
+	if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideEffects)
+		return;
+''', 'effects.cpp: FreezingFlakes — guard фокус-режима')
+sub('src/game/client/components/hud.cpp', r'''	bool ShowHud = g_Config.m_ClShowhud;
+#if defined(CONF_VIDEORECORDER)
+	ShowHud = (IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud);
+#endif
+	if(ShowHud)
+	{
+''', r'''	bool ShowHud = g_Config.m_ClShowhud;
+#if defined(CONF_VIDEORECORDER)
+	ShowHud = (IVideo::Current() && g_Config.m_ClVideoShowhud) || (!IVideo::Current() && g_Config.m_ClShowhud);
+#endif
+	if(ShowHud)
+	{
+		// melancholy: фокус-режим скрывает HUD (BestClient @ 81ca85f)
+		if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideHud)
+		{
+			RenderCursor();
+			return;
+		}
+''', 'hud.cpp: фокус-режим скрывает HUD')
+sub('src/game/client/components/infomessages.cpp', r'''if(Client()->GameTick(g_Config.m_ClDummy) > InfoMsg.m_Tick + Client()->GameTickSpeed() * 10)
+		{
+			ResetMessage(InfoMsg);
+			continue;
+		}
+
+		CreateTextContainersIfNotCreated(InfoMsg);''', r'''if(Client()->GameTick(g_Config.m_ClDummy) > InfoMsg.m_Tick + Client()->GameTickSpeed() * 10)
+		{
+			ResetMessage(InfoMsg);
+			continue;
+		}
+
+		// melancholy: фокус-режим прячет инфо-сообщения (BestClient @ 81ca85f)
+		if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideUI)
+			continue;
+		// melancholy
+
+		CreateTextContainersIfNotCreated(InfoMsg);''', 'infomessages.cpp: фокус-режим прячет инфо-сообщения')
+sub('src/game/client/components/tclient/tclient.cpp', r'''str_format(aBuf, sizeof(aBuf), "/w %s %s", aPlayerName, g_Config.m_TcAutoReplyMutedMessage);
+			else
+				str_format(aBuf, sizeof(aBuf), "%s: %s", aPlayerName, g_Config.m_TcAutoReplyMutedMessage);
+			SendNonDuplicateMessage(0, aBuf);
+			return;
+		}
+''', r'''str_format(aBuf, sizeof(aBuf), "/w %s %s", aPlayerName, g_Config.m_TcAutoReplyMutedMessage);
+			else
+				str_format(aBuf, sizeof(aBuf), "%s: %s", aPlayerName, g_Config.m_TcAutoReplyMutedMessage);
+			SendNonDuplicateMessage(0, aBuf);
+			return;
+		}
+
+		// melancholy: автоответ в фокус-режиме (BestClient @ 81ca85f)
+		if(g_Config.m_ClFocusMode && g_Config.m_ClFocusModeHideChat && g_Config.m_ClFocusModeAutoReply)
+		{
+			char aBuf[256];
+			if(pMsg->m_Team == TEAM_WHISPER_RECV || ServerCommandExists("w"))
+				str_format(aBuf, sizeof(aBuf), "/w %s %s", aPlayerName, g_Config.m_ClFocusModeAutoReplyMessage);
+			else
+				str_format(aBuf, sizeof(aBuf), "%s: %s", aPlayerName, g_Config.m_ClFocusModeAutoReplyMessage);
+			SendNonDuplicateMessage(0, aBuf);
+			return;
+		}
+''', 'tclient.cpp: автоответ фокус-режима при пинге')
+sub('src/game/client/components/tclient/zz_menus_settings.cpp', r'''ColorRGBA(1.0f, 0.34f, 0.28f, 1.0f), false);
+		}
+
+		CUIRect ContentEnd = MainView;''', r'''ColorRGBA(1.0f, 0.34f, 0.28f, 1.0f), false);
+		}
+
+             // Melancholy v1.1.11: Погода (BestClient @ 81ca85f, menus_fx.cpp).
+                {
+                        CUIRect Inner, TypeLabel, SliderRow;
+                        const int WeatherType = std::clamp(g_Config.m_BcWeather, 0, 3);
+                        const int WeatherRows = g_Config.m_BcAtmosphere ? (WeatherType == 0 || WeatherType == 1 ? 4 : 3) : 0;
+                        const float WeatherHeight = 62.0f + (g_Config.m_BcAtmosphere ? 25.0f * (2 + WeatherRows) + 10.0f : 0.0f);
+                        DoFeaturePanel(Right, WeatherHeight, Localize("Погода"), Inner);
+                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                        DoGoldCheckAuto(&g_Config.m_BcAtmosphere,
+                                Localize("Включить"), &g_Config.m_BcAtmosphere,
+                                &Inner, 20.0f);
+                        if(g_Config.m_BcAtmosphere)
+                        {
+                                Inner.HSplitTop(20.0f, &TypeLabel, &Inner);
+                                Ui()->DoLabel(&TypeLabel, Localize("Тип погоды"), 14.0f, TEXTALIGN_ML);
+                                std::array<const char *, 4> aMelWeatherTypes = {"Снег", "Дождь", "Светлячки", "Пыль"};
+                                static CUi::SDropDownState s_MelWeatherDropDownState;
+                                static CScrollRegion s_MelWeatherDropDownScrollRegion;
+                                s_MelWeatherDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_MelWeatherDropDownScrollRegion;
+                                Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                const int NewMelWeatherType = DoGoldDropDown(&SliderRow, WeatherType,
+                                        aMelWeatherTypes.data(), (int)aMelWeatherTypes.size(), s_MelWeatherDropDownState);
+                                if(NewMelWeatherType != WeatherType)
+                                        g_Config.m_BcWeather = NewMelWeatherType;
+                                Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                DoGoldScrollbar(&g_Config.m_BcWeatherAmount,
+                                        &g_Config.m_BcWeatherAmount, &SliderRow,
+                                        Localize("Количество"), 25, 300);
+                                if(WeatherType == 3)
+                                {
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcAmbientDustAmount,
+                                                &g_Config.m_BcAmbientDustAmount, &SliderRow,
+                                                Localize("Количество пыли"), 25, 200);
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherDustSize,
+                                                &g_Config.m_BcWeatherDustSize, &SliderRow,
+                                                Localize("Размер"), 25, 300);
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherDustSpeed,
+                                                &g_Config.m_BcWeatherDustSpeed, &SliderRow,
+                                                Localize("Скорость"), 25, 300);
+                                }
+                                else if(WeatherType == 2)
+                                {
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherFireflySize,
+                                                &g_Config.m_BcWeatherFireflySize, &SliderRow,
+                                                Localize("Размер"), 25, 300);
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherFireflySpeed,
+                                                &g_Config.m_BcWeatherFireflySpeed, &SliderRow,
+                                                Localize("Скорость"), 25, 300);
+                                }
+                                else if(WeatherType == 1)
+                                {
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherRainSize,
+                                                &g_Config.m_BcWeatherRainSize, &SliderRow,
+                                                Localize("Размер"), 25, 300);
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherRainSpeed,
+                                                &g_Config.m_BcWeatherRainSpeed, &SliderRow,
+                                                Localize("Скорость"), 25, 300);
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherRainTilt,
+                                                &g_Config.m_BcWeatherRainTilt, &SliderRow,
+                                                Localize("Наклон"), -75, 75);
+                                }
+                                else
+                                {
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherSnowSize,
+                                                &g_Config.m_BcWeatherSnowSize, &SliderRow,
+                                                Localize("Размер"), 25, 300);
+                                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                        DoGoldScrollbar(&g_Config.m_BcWeatherSnowSpeed,
+                                                &g_Config.m_BcWeatherSnowSpeed, &SliderRow,
+                                                Localize("Скорость"), 25, 300);
+                                        DoGoldCheckAuto(&g_Config.m_BcWeatherSnowflakes,
+                                                Localize("Снежинки-спрайты"), &g_Config.m_BcWeatherSnowflakes,
+                                                &Inner, 20.0f);
+                                }
+                        }
+                }
+
+                // Melancholy v1.1.11: Моушен блюр (BestClient @ 81ca85f, menus_bestclient.cpp).
+                {
+                        CUIRect Inner, SliderRow;
+                        const float MelMotionBlurHeight = 62.0f + (g_Config.m_BcMotionBlur ? 55.0f : 0.0f);
+                        DoFeaturePanel(Right, MelMotionBlurHeight, Localize("Моушен блюр"), Inner);
+                        Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                        DoGoldCheckAuto(&g_Config.m_BcMotionBlur,
+                                Localize("Включить"), &g_Config.m_BcMotionBlur,
+                                &Inner, 20.0f);
+                        if(g_Config.m_BcMotionBlur)
+                        {
+                                Inner.HSplitTop(20.0f, &SliderRow, &Inner);
+                                DoGoldScrollbar(&g_Config.m_BcMotionBlurStrength,
+                                        &g_Config.m_BcMotionBlurStrength, &SliderRow,
+                                        Localize("Сила смешивания"), 1, 95);
+                        }
+                }
+
+				CUIRect ContentEnd = MainView;''', 'zz_menus_settings.cpp: Погода + Моушен блюр во вкладке «Визуал»')
+sub('src/game/client/components/tclient/zz_menus_settings.cpp', r'''Ui()->DoLabel(&Label, Localize("Control: arrow keys"), 13.0f, TEXTALIGN_ML);
+        }
+
+        {
+                CUIRect Inner;
+                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);''', r'''Ui()->DoLabel(&Label, Localize("Control: arrow keys"), 13.0f, TEXTALIGN_ML);
+        }
+
+
+        // Melancholy v1.1.11: Фокус режим (BestClient @ 81ca85f, menus_bestclient.cpp).
+        {
+                CUIRect Inner, ReplyLabel, ReplyRow;
+                const float MelLineSize = 20.0f;
+                const float MelFocusHeight = 46.0f + MelLineSize * (g_Config.m_ClFocusMode ? 8 : 1) +
+                        (g_Config.m_ClFocusMode && g_Config.m_ClFocusModeAutoReply ? 70.0f : 0.0f);
+                DoFeaturePanel(RightView, MelFocusHeight, Localize("Фокус режим"), Inner);
+                Inner.HSplitTop(MelLineSize, &ReplyRow, &Inner);
+                DoGoldCheckAuto(&g_Config.m_ClFocusMode,
+                        Localize("Включить"), &g_Config.m_ClFocusMode,
+                        &Inner, MelLineSize);
+                if(g_Config.m_ClFocusMode)
+                {
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeHideNames,
+                                Localize("Скрывать ники игроков"), &g_Config.m_ClFocusModeHideNames,
+                                &Inner, MelLineSize);
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeHideEffects,
+                                Localize("Скрывать эффекты"), &g_Config.m_ClFocusModeHideEffects,
+                                &Inner, MelLineSize);
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeHideHud,
+                                Localize("Скрывать HUD"), &g_Config.m_ClFocusModeHideHud,
+                                &Inner, MelLineSize);
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeHideUI,
+                                Localize("Скрывать лишний интерфейс"), &g_Config.m_ClFocusModeHideUI,
+                                &Inner, MelLineSize);
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeHideChat,
+                                Localize("Скрывать чат"), &g_Config.m_ClFocusModeHideChat,
+                                &Inner, MelLineSize);
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeHideScoreboard,
+                                Localize("Скрывать таблицу счёта"), &g_Config.m_ClFocusModeHideScoreboard,
+                                &Inner, MelLineSize);
+                        DoGoldCheckAuto(&g_Config.m_ClFocusModeAutoReply,
+                                Localize("Автоответ при скрытом чате"), &g_Config.m_ClFocusModeAutoReply,
+                                &Inner, MelLineSize);
+                        if(g_Config.m_ClFocusModeAutoReply)
+                        {
+                                Inner.HSplitTop(MelLineSize, &ReplyLabel, &Inner);
+                                Ui()->DoLabel(&ReplyLabel, Localize("Сообщение автоответа"), 13.0f, TEXTALIGN_ML);
+                                Inner.HSplitTop(26.0f, &ReplyRow, &Inner);
+                                static CLineInput s_MelFocusAutoReplyInput(g_Config.m_ClFocusModeAutoReplyMessage,
+                                        sizeof(g_Config.m_ClFocusModeAutoReplyMessage));
+                                s_MelFocusAutoReplyInput.SetEmptyText("my chat is hidden");
+                                DoGoldEditBox(&s_MelFocusAutoReplyInput, &ReplyRow, 13.0f);
+                        }
+                }
+        }
+
+        {
+                CUIRect Inner;
+                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);''', 'zz_menus_settings.cpp: Фокус режим во вкладке «Разное»')
+sub('CMakeLists.txt', r'''    avoid/fake_aim.cpp
+    avoid/fake_aim.h
+''', r'''    avoid/fake_aim.cpp
+    avoid/fake_aim.h
+    components/bestclient/fx/fgf_glow.cpp
+    components/bestclient/fx/fgf_glow.h
+    components/bestclient/fx/fgf_weather.cpp
+    components/bestclient/fx/fgf_weather.h
+''', 'CMakeLists: bestclient погода в GAME_CLIENT')
 # ---------------------------------------------------------------- отчёт
 print("== patch_melancholy: применено %d, ошибок %d" % (len(OK), len(FAIL)))
 if FAIL:
