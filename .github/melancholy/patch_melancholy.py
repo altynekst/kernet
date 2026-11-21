@@ -3707,9 +3707,12 @@ namespace OpenKrx
 \t\t// tee. Switching the active dummy does not create another set of locks.
 \t\tCSlot m_State{};
 
-\t\tstatic bool Playing(CGameClient *pGameClient, const CNetObj_PlayerInput &Input);
-\t\tstatic bool Spectating(CGameClient *pGameClient);
-\t\tstatic float RandomRadians();
+\t\t// Playing/Spectating/RandomRadians — файловые функции анонимного
+\t\t// namespace в bots.cpp исходника (строки 24/29/43), ЧЛЕНАМИ КЛАССА
+\t\t// НЕ ЯВЛЯЮТСЯ. Объявления членов здесь приводили к ошибке линковки:
+\t\t// ld.lld: undefined symbol: OpenKrx::CFakeAim::Spectating/Playing/
+\t\t// RandomRadians — вызовы внутри FakeAim связывались с объявлениями
+\t\t// членов, а определения жили в анонимном namespace.
 \t\tstatic int ClosestPlayer(CGameClient *pGameClient);
 
 \tpublic:
