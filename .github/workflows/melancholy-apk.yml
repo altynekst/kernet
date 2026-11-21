@@ -122,5 +122,6 @@ jobs:
             --title "Melancholy v${{ github.run_number }} (19.8 + KRX Avoid)" \
             --notes "Melancholy = kernet + порт крх-авойда из Nullcki @ ${NULLCKI_SHA}.
           Вкладка: Настройки -> KernelNet -> Avoid (дропдаун агентов: Basic/Legit/Blatant/Fent Bot/Pilot Bot).
+          Лазерный анфриз (Auto Unfreeze + хоткей): Настройки -> KernelNet -> Разное.
           Ставится поверх прошлых сборок melancholy — подпись та же." \
             --latest || gh release upload "melancholy-v${{ github.run_number }}" artifacts/*.apk --clobber
