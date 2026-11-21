@@ -7772,6 +7772,381 @@ sub('src/game/client/components/tclient/zz_menus_settings.cpp',
     _MEL_FNG_ANCHOR, _MEL_FNG_REPL,
     'zz_menus_settings.cpp: Свои тайлы во вкладке FNG (v1.1.13)')
 
+# ================================================================ 17. v1.1.14: Макс буст сенсы (вертолёт)
+print("== секция 17: v1.1.14 — макс буст сенсы во вкладке «Разное»")
+
+# 17.1 конфиги
+sub('src/engine/shared/config_variables.h',
+    'MACRO_CONFIG_INT(ClZzFngMapTiles, cl_zz_fng_map_tiles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FNG: do not mask custom entity tiles (show map custom tiles)")\n',
+    'MACRO_CONFIG_INT(ClZzFngMapTiles, cl_zz_fng_map_tiles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FNG: do not mask custom entity tiles (show map custom tiles)")\n'
+    '// Melancholy v1.1.14: Макс буст сенсы (Разное) — прицел крутится как вертолёт\n'
+    'MACRO_CONFIG_INT(ClMxSensBoost, cl_mx_sens_boost, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable max sens boost (helicopter aim)")\n'
+    'MACRO_CONFIG_INT(ClMxSensBoostMult, cl_mx_sens_boost_mult, 100, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Max sens boost multiplier (x1..x100)")\n',
+    'config_variables.h: макс буст сенсы (v1.1.14)')
+
+# 17.2 controls.cpp: аппаратные мышь/джойстик — множитель дельты в OnCursorMove
+sub('src/game/client/components/controls.cpp',
+    '\tm_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor;\n',
+    '\t// Melancholy v1.1.14: макс буст сенсы\n'
+    '\tconst float MelSensBoost = g_Config.m_ClMxSensBoost ? (float)g_Config.m_ClMxSensBoostMult : 1.0f;\n'
+    '\tm_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor * MelSensBoost;\n',
+    'controls.cpp: буст в OnCursorMove')
+
+# 17.3 touch_controls.cpp: джойстик прицела в спектаторе — множитель дельты
+sub('src/game/client/components/touch_controls.cpp',
+    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -m_AccumulatedDelta * WorldScreenSize;\n',
+    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -m_AccumulatedDelta * WorldScreenSize *\n'
+    '\t\t\t\t(g_Config.m_ClMxSensBoost ? (float)g_Config.m_ClMxSensBoostMult : 1.0f); // Melancholy v1.1.14\n',
+    'touch_controls.cpp: буст джойстика (spec, множитель)')
+
+# 17.4 touch_controls.cpp: джойстик прицела в игре (абсолютный) — множитель УГЛА
+sub('src/game/client/components/touch_controls.cpp',
+    '\t\tconst vec2 AbsolutePosition = (m_ActivePosition - vec2(0.5f, 0.5f)) * 2.0f;\n'
+    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] = AbsolutePosition * (Controls.GetMaxMouseDistance() - Controls.GetMinMouseDistance()) + normalize(AbsolutePosition) * Controls.GetMinMouseDistance();\n',
+    '\t\tconst vec2 AbsolutePosition = (m_ActivePosition - vec2(0.5f, 0.5f)) * 2.0f;\n'
+    '\t\t// Melancholy v1.1.14: макс буст сенсы — угол прицела умножается\n'
+    '\t\tvec2 MelBoostPosition = AbsolutePosition;\n'
+    '\t\tif(g_Config.m_ClMxSensBoost && length(AbsolutePosition) > 0.0001f)\n'
+    '\t\t\tMelBoostPosition = rotate(AbsolutePosition, ((float)g_Config.m_ClMxSensBoostMult - 1.0f) * atan2f(AbsolutePosition.y, AbsolutePosition.x));\n'
+    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] = MelBoostPosition * (Controls.GetMaxMouseDistance() - Controls.GetMinMouseDistance()) + normalize(MelBoostPosition) * Controls.GetMinMouseDistance();\n',
+    'touch_controls.cpp: буст джойстика (in-game, угол)')
+
+# 17.5 touch_controls.cpp: direct touch в спектаторе — множитель дельты
+sub('src/game/client/components/touch_controls.cpp',
+    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -DirectFingerState.m_Delta * WorldScreenSize;\n',
+    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -DirectFingerState.m_Delta * WorldScreenSize *\n'
+    '\t\t\t\t(g_Config.m_ClMxSensBoost ? (float)g_Config.m_ClMxSensBoostMult : 1.0f); // Melancholy v1.1.14\n',
+    'touch_controls.cpp: буст direct touch (spec, множитель)')
+
+# 17.6 touch_controls.cpp: direct touch в игре (абсолютный) — множитель УГЛА
+sub('src/game/client/components/touch_controls.cpp',
+    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] = (DirectFingerState.m_Position - vec2(0.5f, 0.5f)) * WorldScreenSize;\n'
+    '\t\t\tControls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::ABSOLUTE;\n',
+    '\t\t\t// Melancholy v1.1.14: макс буст сенсы — угол прицела умножается\n'
+    '\t\t\tvec2 MelDirectPos = (DirectFingerState.m_Position - vec2(0.5f, 0.5f)) * WorldScreenSize;\n'
+    '\t\t\tif(g_Config.m_ClMxSensBoost && length(MelDirectPos) > 0.0001f)\n'
+    '\t\t\t\tMelDirectPos = rotate(MelDirectPos, ((float)g_Config.m_ClMxSensBoostMult - 1.0f) * atan2f(MelDirectPos.y, MelDirectPos.x));\n'
+    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] = MelDirectPos;\n'
+    '\t\t\tControls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::ABSOLUTE;\n',
+    'touch_controls.cpp: буст direct touch (in-game, угол)')
+
+# 17.7 вкладка «Разное»: карточка «Макс буст сенсы» после «Фокус режим»
+sub('src/game/client/components/tclient/zz_menus_settings.cpp',
+    '        }\n\n'
+    '        {\n'
+    '                CUIRect Inner;\n'
+    '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
+    '        }\n\n'
+    '        // Melancholy v1.1.14: Макс буст сенсы — прицел крутится как вертолёт.\n'
+    '        {\n'
+    '                CUIRect Inner;\n'
+    '                DoFeaturePanel(RightView, 106.0f, Localize("Макс буст сенсы"), Inner);\n'
+    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                DoGoldCheckAuto(&g_Config.m_ClMxSensBoost,\n'
+    '                        Localize("Включить"), &g_Config.m_ClMxSensBoost,\n'
+    '                        &Inner, LineSize);\n'
+    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                DoGoldScrollbar(&g_Config.m_ClMxSensBoostMult,\n'
+    '                        &g_Config.m_ClMxSensBoostMult, &Button,\n'
+    '                        Localize("Множитель"), 1, 100);\n'
+    '                Inner.HSplitTop(LineSize, &Label, &Inner);\n'
+    '                Ui()->DoLabel(&Label, Localize("100 = вертолёт"), 13.0f, TEXTALIGN_ML);\n'
+    '        }\n\n'
+    '        {\n'
+    '                CUIRect Inner;\n'
+    '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
+    'zz_menus_settings.cpp: панель «Макс буст сенсы» в «Разном» (v1.1.14)')
+
+
+
+
+# ================================================================ 18. v1.1.15: Pseudofly (вкладка «Полёт», старый флай удалён)
+print("== секция 18: v1.1.15 — Pseudofly вместо старого флая")
+
+# ---- локальные хелперы секции (cwd = корень дерева) ----
+import gzip as _gzip
+import base64 as _base64
+import os as _os
+
+def _pf_rd(path):
+    return open(path, "rb").read().decode("utf-8").replace("\r\n", "\n")
+
+def _pf_wr(path, text):
+    open(path, "wb").write(text.encode("utf-8"))
+    print("  + %s записан" % path)
+
+def _pf_span(path, label, start_sub, end_sub, new_lines, expect_ind=None):
+    """Замена спана: от начала строки со start_sub до конца строки с end_sub."""
+    text = _pf_rd(path)
+    n = text.count(start_sub)
+    if n != 1:
+        fail("%s: якорь старта x%d (%s)" % (path, n, label))
+        return
+    a = text.find(start_sub)
+    i = text.rfind("\n", 0, a) + 1
+    b = text.find(end_sub, a)
+    if b < 0:
+        fail("%s: якорь конца не найден (%s)" % (path, label))
+        return
+    j = text.find("\n", b) + 1
+    if expect_ind is not None and text[i:a] != expect_ind:
+        fail("%s: отступ старта %r != %r (%s)" % (path, text[i:a], expect_ind, label))
+        return
+    new_text = "\n".join(new_lines) + "\n" if new_lines else ""
+    _pf_wr(path, text[:i] + new_text + text[j:])
+
+def _pf_sub(path, label, old, new, count=1):
+    text = _pf_rd(path)
+    n = text.count(old)
+    if n != count:
+        fail("%s: якорь x%d (хотим %d) (%s)" % (path, n, count, label))
+        return
+    _pf_wr(path, text.replace(old, new, count))
+
+# ---- 18.0 новые файлы компонента ----
+_PF_DIR = "src/game/client/components/pseudofly"
+_pf_mkdir = "src/game/client/components/pseudofly"
+if not _os.path.isdir(_pf_mkdir):
+    _os.makedirs(_pf_mkdir, exist_ok=True)
+_PF_FILES = {
+    "pseudofly.h": "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",
+    "pseudofly.cpp": "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",
+}
+for _name, _b64 in _PF_FILES.items():
+    _body = _gzip.decompress(_base64.b64decode(_b64))
+    open(_os.path.join(_pf_mkdir, _name), "wb").write(_body)
+    print("  + %s/%s (%d байт)" % (_pf_mkdir, _name, len(_body)))
+
+# ---- 18.1 конфиги: старый флай -> Pseudofly ----
+_PF_CONFIGS = "\n".join([
+    "// Melancholy v1.1.15: Pseudofly — пара «игрок + дамми» в воздухе (вкладка «Полёт»).",
+    "MACRO_CONFIG_INT(ClPseudoFly, cl_pseudofly, 0, 0, 1,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: keep the player+dummy pair airborne by aim\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyXTol, cl_pseudofly_xtol, 32, 4, 160,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: X alignment tolerance in pixels\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyHorizon, cl_pseudofly_horizon, 12, 4, 20,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: prediction horizon in ticks\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyK, cl_pseudofly_k, 5, 1, 100,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: aim steering gain, stored x0.01\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyDead, cl_pseudofly_dead, 24, 0, 120,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: dead zone radius in pixels\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyRole, cl_pseudofly_role, 0, 0, 1,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly role: 0 dummy on top hammers me, 1 dummy hooks only\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyTraj, cl_pseudofly_traj, 1, 0, 1,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: show predicted trajectory\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyLabel, cl_pseudofly_label, 1, 0, 1,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: show label above the tee\")",
+    "MACRO_CONFIG_INT(ClPseudoFlyCands, cl_pseudofly_cands, 16, 6, 32,",
+    "\tCFGFLAG_CLIENT | CFGFLAG_SAVE,",
+    "\t\"Pseudofly: candidate budget per tick\")",
+])
+_pf_span("src/engine/shared/config_variables.h", "конфиг: FlyHelperEnabled -> Pseudofly",
+         "MACRO_CONFIG_INT(ClZzFlyHelperEnabled,", 'predictive fly helper")',
+         _PF_CONFIGS.split("\n"), "")
+_pf_span("src/engine/shared/config_variables.h", "конфиг: Relaxed..TripleFly удалены",
+         "MACRO_CONFIG_INT(ClZzFlyHelperRelaxed,", 'tee below between strikes")', [], "")
+
+# ---- 18.2 gameclient.h: include + члены ----
+_pf_span("src/game/client/gameclient.h", "include pseudofly.h",
+         '#include "avoid/fake_aim.h"', '#include "avoid/fake_aim.h"',
+         ['#include "avoid/fake_aim.h"',
+          '',
+          '#include "components/pseudofly/pseudofly.h" // Melancholy v1.1.15'])
+_pf_span("src/game/client/gameclient.h", "члены m_Pseudofly + m_PseudoFlyAledOwned",
+         "OpenKrx::CFakeAim m_KrxFakeAim;", "OpenKrx::CFakeAim m_KrxFakeAim;",
+         ['\tOpenKrx::CFakeAim m_KrxFakeAim;',
+          '\t// Melancholy v1.1.15: Pseudofly — пара «игрок + дамми» держится в воздухе.',
+          '\tCPseudoFly m_Pseudofly;',
+          '\t// Melancholy v1.1.15: Auto ALED владел пакетом игрока в этом тике (приоритет Pseudofly).',
+          '\tbool m_PseudoFlyAledOwned = false;'])
+
+# ---- 18.3 gameclient.cpp: вход игрока/дамми + удаление старого флая ----
+_pf_span("src/game/client/gameclient.cpp", "dummy-ветка: статики + Pseudofly",
+         "static vec2 s_aFlyStrikeDir[NUM_DUMMIES]", "if(!DummyHammerMode && !FlyHelper)",
+         ['\tstatic vec2 s_aFlyStrikeDir[NUM_DUMMIES] = {',
+          '\t\tvec2(0.0f, -1.0f), vec2(0.0f, -1.0f), vec2(0.0f, -1.0f)};',
+          '\tstatic int s_aFlyCooldownCalls[NUM_DUMMIES] = {0, 0, 0};',
+          '\tstatic int s_aFlyFire[NUM_DUMMIES] = {0, 0, 0};',
+          '\tstatic bool s_aFlyWasDummyHammer[NUM_DUMMIES] = {false, false, false};',
+          '\tconst int ActiveDummy = g_Config.m_ClDummy;',
+          '\tconst bool DummyHammerMode =',
+          '\t\t!g_Config.m_ClZzFlyRide && g_Config.m_ClDummyHammer != 0 && !m_IsDummySwapping;',
+          '',
+          '\t// Melancholy v1.1.15: Pseudofly — дамми-движок пары. Пока летим, вход',
+          '\t// дамми полностью наш (перекрывает dummy hammer и hook fly).',
+          '\tif(m_Pseudofly.DummyTakeOver(this, pData, PairConn, sizeof(CNetObj_PlayerInput), Force))',
+          '\t\treturn sizeof(CNetObj_PlayerInput);',
+          '',
+          '\tif(!DummyHammerMode)'], "\t")
+_pf_span("src/game/client/gameclient.cpp", "reset m_PseudoFlyAledOwned",
+         "const CNetObj_PlayerInput OrigInput = *pInput;", "const CNetObj_PlayerInput OrigInput = *pInput;",
+         ['\t\tconst CNetObj_PlayerInput OrigInput = *pInput;',
+          '\t\t// Melancholy v1.1.15: сброс флага владения входом Auto ALED.',
+          '\t\tm_PseudoFlyAledOwned = false;'], "\t\t")
+_pf_sub("src/game/client/gameclient.cpp", "ALED: m_PseudoFlyAledOwned = true",
+        "\t\t\t\t\t\tAutoAledPacketOwned = true;\n",
+        "\t\t\t\t\t\tAutoAledPacketOwned = true;\n\t\t\t\t\t\tm_PseudoFlyAledOwned = true;\n", 2)
+_pf_span("src/game/client/gameclient.cpp", "PlayerTakeOver перед ownership-комментарием",
+         "// Input ownership is evaluated exactly once, on the final packet.",
+         "// Input ownership is evaluated exactly once, on the final packet.",
+         ['\t\t// Melancholy v1.1.15: Pseudofly — приоритет входа:',
+          '\t\t// LaserUnfreeze > Auto ALED > Pseudofly > Avoid.',
+          '\t\tm_Pseudofly.PlayerTakeOver(this, pInput, OrigInput,',
+          '\t\t\tClient()->PredGameTick(g_Config.m_ClDummy));',
+          '',
+          '\t\t// Input ownership is evaluated exactly once, on the final packet.'], "\t\t")
+_pf_span("src/game/client/gameclient.cpp", "FlyHitRange удалён",
+         "const float FlyHitRange =", "10.0f;", [], "\t\t")
+_pf_span("src/game/client/gameclient.cpp", "оба лямбда-хелпера удалены",
+         "auto HammerDelayCalls = [&]() {", "if(m_DummyFire == 0)",
+         ['\t\tif(m_DummyFire == 0)'], "\t\t")
+_pf_sub("src/game/client/gameclient.cpp", "InRange удалён",
+        "\t\tbool InRange = false;\n", "", 1)
+_pf_sub("src/game/client/gameclient.cpp", "гвард DummyHammerMode упрощён",
+        "DummyHammerMode && !FlyHelper && DummyCid >= 0 && LocalCid >= 0",
+        "DummyCid >= 0 && LocalCid >= 0", 1)
+_pf_span("src/game/client/gameclient.cpp", "if(FlyHelper) блок удалён",
+         "if(FlyHelper)", "m_HammerInput.m_Direction = m_DummyInput.m_Direction;",
+         ['\t\tm_HammerInput.m_Direction = m_DummyInput.m_Direction;'], "\t\t")
+_pf_sub("src/game/client/gameclient.cpp", "NeedSend без FlyHelper",
+        "const bool NeedSend = Force || FlyHelper || DummyHammerMode ||",
+        "const bool NeedSend = Force || DummyHammerMode ||", 1)
+_pf_sub("src/game/client/gameclient.cpp", "WantedWeapon без FlyHelper",
+        "if(DummyHammerMode || FlyHelper)", "if(DummyHammerMode)", 1)
+_pf_span("src/game/client/gameclient.cpp", "TripleFly блок удалён",
+         "// Triple fly from the supplied OnSnapInput.",
+         "mem_copy(pData, &Out, sizeof(Out));",
+         ['\t\tmem_copy(pData, &Out, sizeof(Out));',
+          '\t\treturn sizeof(Out);'], "\t\t")
+_pf_span("src/game/client/gameclient.cpp", "OnReset: m_Pseudofly.OnReset()",
+         "m_RescueBots.OnReset();", "m_RescueBots.OnReset();",
+         ['\tm_RescueBots.OnReset();',
+          '\tm_Pseudofly.OnReset(); // Melancholy v1.1.15'], "\t")
+_pf_span("src/game/client/gameclient.cpp", "OnRender: m_Pseudofly.Render(this)",
+         "m_Avoid.Render(this);", "m_Avoid.Render(this);",
+         ['\t\tm_Avoid.Render(this);',
+          '\t\t// Melancholy v1.1.15: Pseudofly — траектория и надпись над тием.',
+          '\t\tm_Pseudofly.Render(this);'], "\t\t")
+
+# ---- 18.4 controls.cpp: форс-отправка на тикрейте ----
+_pf_span("src/game/client/components/controls.cpp", "tickrate send для Pseudofly",
+         "if(g_Config.m_ClZzAutoAled && GameClient()->m_Snap.m_pLocalCharacter)",
+         "Send = Send || time_get() > m_LastSendTime + time_freq() / TickSpeed;",
+         ['\t\tif(g_Config.m_ClZzAutoAled && GameClient()->m_Snap.m_pLocalCharacter)',
+          '\t\t{',
+          '\t\t\tconst int TickSpeed = maximum(1, Client()->GameTickSpeed());',
+          '\t\t\tSend = Send || time_get() > m_LastSendTime + time_freq() / TickSpeed;',
+          '\t\t}',
+          '\t\t// Melancholy v1.1.15: Pseudofly бьёт тиками — слать на тикрейте, пока активен.',
+          '\t\tif(g_Config.m_ClPseudoFly && GameClient()->m_Pseudofly.Active() &&',
+          '\t\t\tGameClient()->m_Snap.m_pLocalCharacter)',
+          '\t\t{',
+          '\t\t\tconst int TickSpeed = maximum(1, Client()->GameTickSpeed());',
+          '\t\t\tSend = Send || time_get() > m_LastSendTime + time_freq() / TickSpeed;',
+          '\t\t}'], "\t\t")
+_pf_sub("src/game/client/components/controls.cpp", "controls: снять дубль скобки ALED",
+        "\t\t\tSend = Send || time_get() > m_LastSendTime + time_freq() / TickSpeed;\n\t\t}\n\t\t}\n\t\t// Tile Aim updates",
+        "\t\t\tSend = Send || time_get() > m_LastSendTime + time_freq() / TickSpeed;\n\t\t}\n\t\t// Tile Aim updates", 1)
+
+# ---- 18.5 unfreeze_bot.h: OwnsInputThisTick ----
+_pf_span("src/game/client/avoid/unfreeze_bot.h", "accessor OwnsInputThisTick",
+         "void OnReset();", "void OnReset();",
+         ['\t\tvoid OnReset();',
+          '\t\t// Melancholy v1.1.15: анфриз владеет входом в этом тике (приоритет Pseudofly).',
+          '\t\tbool OwnsInputThisTick() const',
+          '\t\t{',
+          '\t\t\treturn m_UnfreezePulse.m_Modulo != 0 || !m_UnfreezeAimReleased;',
+          '\t\t}'], "\t\t")
+
+# ---- 18.6 hud.cpp: индикатор ----
+_pf_span("src/game/client/components/hud.cpp", "hud: Fly -> Pseudofly",
+         "if(g_Config.m_ClZzFlyHelperEnabled)", 'vLines.push_back("Fly");',
+         ['\t\tif(g_Config.m_ClPseudoFly)',
+          '\t\t\tvLines.push_back("Fly");'], "\t\t")
+
+# ---- 18.7 вкладка «Полёт»: карточка Pseudofly ----
+_PF_CARD = [
+    '\t\t// Melancholy v1.1.15: Pseudofly вместо старого флая.',
+    '\t\tDoFeaturePanel(MainView, 240.0f, Localize("Pseudofly"), Inner);',
+    '\t\tDoGoldCheckAuto(&g_Config.m_ClPseudoFly, Localize("Включить"),',
+    '\t\t\t&g_Config.m_ClPseudoFly, &Inner, LineSize);',
+    '\t\tInner.HSplitTop(LineSize, &Button, &Inner);',
+    '\t\tDoGoldScrollbar(&g_Config.m_ClPseudoFlyXTol, &g_Config.m_ClPseudoFlyXTol, &Button,',
+    '\t\t\tLocalize("Допуск по X (px)"), 4, 160);',
+    '\t\tInner.HSplitTop(LineSize, &Button, &Inner);',
+    '\t\tDoGoldScrollbar(&g_Config.m_ClPseudoFlyHorizon, &g_Config.m_ClPseudoFlyHorizon, &Button,',
+    '\t\t\tLocalize("Горизонт прогноза (тики)"), 4, 20);',
+    '\t\tInner.HSplitTop(LineSize, &Button, &Inner);',
+    '\t\tDoGoldScrollbar(&g_Config.m_ClPseudoFlyK, &g_Config.m_ClPseudoFlyK, &Button,',
+    '\t\t\tLocalize("Чувствительность x0.01"), 1, 100);',
+    '\t\tInner.HSplitTop(LineSize, &Button, &Inner);',
+    '\t\tDoGoldScrollbar(&g_Config.m_ClPseudoFlyDead, &g_Config.m_ClPseudoFlyDead, &Button,',
+    '\t\t\tLocalize("Мёртвая зона (px)"), 0, 120);',
+    '\t\tInner.HSplitTop(LineSize, &Button, &Inner);',
+    '\t\tDoGoldScrollbar(&g_Config.m_ClPseudoFlyRole, &g_Config.m_ClPseudoFlyRole, &Button,',
+    '\t\t\tLocalize("Роль (0 дамми бьёт, 1 тянется)"), 0, 1);',
+    '\t\tDoGoldCheckAuto(&g_Config.m_ClPseudoFlyTraj, Localize("Показывать траекторию"),',
+    '\t\t\t&g_Config.m_ClPseudoFlyTraj, &Inner, LineSize);',
+    '\t\tDoGoldCheckAuto(&g_Config.m_ClPseudoFlyLabel, Localize("Показывать надпись"),',
+    '\t\t\t&g_Config.m_ClPseudoFlyLabel, &Inner, LineSize);',
+    '\t\tInner.HSplitTop(10.0f, nullptr, &Inner);',
+    '\t\tInner.HSplitTop(LineSize, &Label, &Inner);',
+    '\t\tUi()->DoLabel(&Label, Localize("Дамми сверху — движок, ты снизу. Курсор задаёт, куда лететь."),',
+    '\t\t\t14.0f, TEXTALIGN_ML);',
+    '\t\tInner.HSplitTop(LineSize, &Label, &Inner);',
+    '\t\tUi()->DoLabel(&Label, Localize("Бинд: bind x \\"toggle cl_pseudofly\\""), 14.0f, TEXTALIGN_ML);',
+]
+_pf_span("src/game/client/components/tclient/zz_menus_settings.cpp", "карточка Pseudofly",
+         'DoFeaturePanel(MainView, 250.0f, Localize("Fly"), Inner);',
+         "14.0f, TEXTALIGN_ML);", _PF_CARD, "\t\t")
+
+# ---- 18.8 clickgui: строки старого флая -> Pseudofly ----
+_pf_span("src/game/client/components/zz_clickgui.cpp", "clickgui: Fly..HitTiles -> Pseudofly",
+         '{ERowType::TOGGLE, "Fly", &CConfig::m_ClZzFlyHelperEnabled, 0, 1, 1,',
+         "1, nullptr, 0},",
+         ['\t\t{ERowType::TOGGLE, "Pseudofly", &CConfig::m_ClPseudoFly, 0, 1, 1,',
+          '\t\t\tnullptr, 0},'], "\t\t")
+_pf_span("src/game/client/components/zz_clickgui.cpp", "clickgui: HitMs+Relaxed удалены",
+         '{ERowType::SLIDER, "Hit delay ms", &CConfig::m_ClZzFlyHelperHitMs, 0, 1000,',
+         '{ERowType::TOGGLE, "Hook drive", &CConfig::m_ClZzFlyRide, 0, 1, 1,',
+         ['\t\t{ERowType::TOGGLE, "Hook drive", &CConfig::m_ClZzFlyRide, 0, 1, 1,'], "\t\t")
+_pf_span("src/game/client/components/tclient/zz_clickgui.cpp", "tclient clickgui: старые строки удалены",
+         '{ERowType::TOGGLE, "Fly", &CConfig::m_ClZzFlyHelperEnabled, 0, 1, 1,',
+         '{ERowType::TOGGLE, "Balance bot", &CConfig::m_ClZzBalanceBot, 0, 1, 1,',
+         ['\t\t{ERowType::TOGGLE, "Pseudofly", &CConfig::m_ClPseudoFly, 0, 1, 1,',
+          '\t\t\tnullptr, 0},',
+          '\t\t{ERowType::TOGGLE, "Balance bot", &CConfig::m_ClZzBalanceBot, 0, 1, 1,'], "\t\t")
+_pf_sub("src/game/client/components/tclient/zz_visual_effects.cpp", "toast: конфиг Fly -> Pseudofly",
+        "g_Config.m_ClZzFngAutoLaser, g_Config.m_ClZzFlyHelperEnabled};",
+        "g_Config.m_ClZzFngAutoLaser, g_Config.m_ClPseudoFly};", 1)
+_pf_sub("src/game/client/components/tclient/zz_visual_effects.cpp", "toast: имя Fly helper -> Pseudofly",
+        '"Fly helper"};', '"Pseudofly"};', 1)
+
+# ---- 18.9 CMakeLists.txt ----
+_pf_span("CMakeLists.txt", "CMakeLists: pseudofly",
+         "avoid/fake_aim.h", "avoid/fake_aim.h",
+         ['    avoid/fake_aim.h',
+          '    components/pseudofly/pseudofly.cpp',
+          '    components/pseudofly/pseudofly.h'], "    ")
+
+# ---- 18.10 sanity: старых конфигов флая не осталось ----
+for _f in ["src/game/client/gameclient.cpp", "src/game/client/components/hud.cpp",
+           "src/game/client/components/zz_clickgui.cpp"]:
+    _body = _pf_rd(_f)
+    for _c in ["ClZzFlyHelperEnabled", "ClZzFlyHelperRelaxed", "ClZzFlyHelperMode",
+               "ClZzFlyHelperHitTiles", "ClZzFlyHelperHitMs", "ClZzHookFly", "ClZzTripleFly"]:
+        if _c in _body:
+            fail("%s: остался старый конфиг %s" % (_f, _c))
+print("== секция 18: применена")
+
 # ---------------------------------------------------------------- отчёт
 print("== patch_melancholy: применено %d, ошибок %d" % (len(OK), len(FAIL)))
 if FAIL:
