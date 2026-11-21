@@ -13,6 +13,11 @@ patch_melancholy.py — порт КРХ-авойда (OpenKrx) из Nullcki в m
   6) патчит мир предсказания (физика KRX: смерть/телепорты/файер-дилей/взрывы)
   7) вшивает цепочку Avoid в SnapInput (как в Nullcki) + трассировка
      openkrx_avoid_dump + физический прыжок Rocket Save
+  10) v1.1.5: новогодний стиль ВСЕХ вкладок настроек (кроме KernelNet):
+     зелёное стекло, гирлянда с огоньками и шарами на верхней панели,
+     колпак Санты, шапки снега, сосульки, снежинки, падающий снег,
+     омела, еловые лапки; активная вкладка подсвечивается красным;
+     вкладка Melancholy золотая (v1.1.4), страница KernelNet не тронута
   9) v1.1.4: золотой стеклянный стиль (как вкладка Аимбот) распространён
      на ВСЕ вкладки страницы настроек KernelNet: золотые карточки,
      чекбоксы, слайдеры (полная логика DoScrollbarOption: шкалы,
@@ -2663,6 +2668,900 @@ sub("src/game/client/components/menus.cpp",
 # 9.3 RenderStartMenu целиком — новогоднее меню (фон/снег/логотип/кнопки)
 wr("src/game/client/components/menus_start.cpp", NY_MENUS_START_CPP)
 ok("replace src/game/client/components/menus_start.cpp (New Year Edition)")
+
+# ---------------------------------------------------------------- 9f. новогодние вкладки настроек (v1.1.5)
+print("== 9f. Новогодний стиль ВСЕХ вкладок настроек (кроме KernelNet)")
+
+NY_MENUS_H_NEW = r'''
+	// Melancholy v1.1.5: новогодний стиль вкладок настроек (декорации
+	// рисуются процедурно: гирлянда, снег, сосульки, омела, еловые лапки)
+	void RenderNyTopDecor(CUIRect TabBar, IClient::EClientState ClientState);
+	void NyRenderSettingsPage(CUIRect MainView);
+	void NyRenderSnowflakeAt(float X, float Y, float Size, float Alpha, float AngleDeg);
+	void NyRenderSnowflakePattern(CUIRect Area, float Alpha);
+	void NyRenderFallingSnow(CUIRect Area, int Count, float Alpha);
+	void NyRenderSnowCap(CUIRect TopEdge, float Height, float Alpha);
+	void NyRenderIcicles(CUIRect TopEdge, float MaxLen, float Alpha);
+	void NyRenderGarland(CUIRect Area, float Alpha);
+	void NyRenderBauble(vec2 Attach, float Radius, float HangLen, const ColorRGBA &Color, float Alpha);
+	void NyRenderHolly(CUIRect At, float Size, float AngleDeg, bool Flip, float Alpha);
+	void NyRenderPineSprig(CUIRect At, float Size, float AngleDeg, bool Flip, float Alpha);
+	void NyRenderSantaHat(CUIRect At, float Alpha);
+'''
+
+sub("src/game/client/components/menus.h",
+    "\tvoid RenderMenubar(CUIRect Box, IClient::EClientState ClientState);\n",
+    "\tvoid RenderMenubar(CUIRect Box, IClient::EClientState ClientState);\n" + NY_MENUS_H_NEW,
+    "menus.h: методы новогодних вкладок настроек (v1.1.5)")
+
+# --- 9f-1. menus.cpp: красная подсветка шестерёнки настроек + вызов декора сверху
+sub("src/game/client/components/menus.cpp",
+    "\tif(DoButton_MenuTab(&s_SettingsButton, FontIcon::GEAR, ActivePage == PAGE_SETTINGS, &Button, CapsuleCorners, &m_aAnimatorsSmallPage[SMALL_TAB_SETTINGS]))\n"
+    "\t{\n"
+    "\t\tNewPage = PAGE_SETTINGS;\n"
+    "\t}",
+    "\tstatic const ColorRGBA NyGearIdle(0.035f, 0.150f, 0.090f, 0.86f);\n"
+    "\tstatic const ColorRGBA NyGearHover(0.070f, 0.260f, 0.150f, 0.90f);\n"
+    "\tstatic const ColorRGBA NyGearActive(0.86f, 0.16f, 0.20f, 0.92f);\n"
+    "\tconst bool NyGearNy = ClientState == IClient::STATE_OFFLINE &&\n"
+    "\t\t\t\t      m_MenuPage == PAGE_SETTINGS &&\n"
+    "\t\t\t\t      g_Config.m_UiSettingsPage != SETTINGS_KERNELNET;\n"
+    "\tif(DoButton_MenuTab(&s_SettingsButton, FontIcon::GEAR, ActivePage == PAGE_SETTINGS, &Button, CapsuleCorners, &m_aAnimatorsSmallPage[SMALL_TAB_SETTINGS],\n"
+    "\t\t\t   NyGearNy ? &NyGearIdle : nullptr, NyGearNy ? &NyGearActive : nullptr, NyGearNy ? &NyGearHover : nullptr, 10.0f))\n"
+    "\t{\n"
+    "\t\tNewPage = PAGE_SETTINGS;\n"
+    "\t}",
+    "menus.cpp: шестерёнка настроек красная на новогодних вкладках")
+
+sub("src/game/client/components/menus.cpp",
+    "\t\t\tRenderMenubar(TabBar, ClientState);\n",
+    "\t\t\tRenderMenubar(TabBar, ClientState);\n"
+    "\t\t\tRenderNyTopDecor(TabBar, ClientState);\n",
+    "menus.cpp: декор верхней панели на странице настроек (обе ветки)", count=2)
+
+NY_TOP_DECOR_CPP = r'''
+// ============================================================
+// Melancholy v1.1.5: новогодний слой поверх верхней панели меню
+// на странице настроек (все вкладки, кроме KernelNet — там свой
+// золотой стиль). Гирлянда с огоньками, шарами и колпак Санты.
+// ============================================================
+void CMenus::RenderNyTopDecor(CUIRect TabBar, IClient::EClientState ClientState)
+{
+	const bool NySettings =
+		(ClientState == IClient::STATE_OFFLINE && m_MenuPage == PAGE_SETTINGS) ||
+		(ClientState == IClient::STATE_ONLINE && m_GamePage == PAGE_SETTINGS);
+	if(!NySettings)
+		return;
+	if(g_Config.m_UiSettingsPage == SETTINGS_KERNELNET)
+		return;
+
+	// зелёный оттенок верхней панели
+	CUIRect Wash = TabBar;
+	Wash.Draw(ColorRGBA(0.024f, 0.115f, 0.068f, 0.42f), IGraphics::CORNER_ALL, 18.0f);
+
+	// гирлянда с огоньками и шарами во всю ширину панели
+	NyRenderGarland(TabBar, 1.0f);
+
+	// колпак Санты на иконке DDNet (оффлайн-меню: слот любимых сообществ)
+	if(ClientState == IClient::STATE_OFFLINE)
+	{
+		CUIRect HatSlot;
+		HatSlot.x = TabBar.x + 33.0f + 10.0f + 75.0f * 3.0f + 37.5f - 17.0f;
+		HatSlot.y = TabBar.y - 9.0f;
+		HatSlot.w = 34.0f;
+		HatSlot.h = 20.0f;
+		NyRenderSantaHat(HatSlot, 1.0f);
+	}
+}
+
+'''
+
+sub("src/game/client/components/menus.cpp",
+    "void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)\n{",
+    NY_TOP_DECOR_CPP + "void CMenus::RenderMenubar(CUIRect Box, IClient::EClientState ClientState)\n{",
+    "menus.cpp: реализация RenderNyTopDecor")
+
+# --- 9f-2. menus_settings.cpp: новогодние декорации + страница настроек
+NY_SETTINGS_CPP = r'''
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+
+// ============================================================
+// Melancholy v1.1.5: новогодний стиль ВСЕХ вкладок настроек.
+// Декорации рисуются процедурно (без внешних ассетов): еловая
+// гирлянда с цветными огоньками и шарами, шапки снега, сосульки,
+// снежинки, падающий снег, омела, еловые лапки и колпак Санты.
+// Активная вкладка подсвечивается красным («тлеющее» стекло).
+// Вкладка Melancholy (KernelNet) — золотая, рисуется по-другому.
+// ============================================================
+
+static float NyGarlandLightY(const CUIRect &Area, float X, float Time)
+{
+	return Area.y + 15.5f +
+	       3.6f * std::sin(X * 0.043f + Time * 0.70f) +
+	       2.2f * std::sin(X * 0.011f - Time * 0.35f);
+}
+
+void CMenus::NyRenderSnowflakeAt(float X, float Y, float Size, float Alpha, float AngleDeg)
+{
+	if(Size < 1.0f || Alpha <= 0.0f)
+		return;
+	Graphics()->QuadsBegin();
+	for(int Pass = 0; Pass < 2; ++Pass)
+	{
+		const float PassSize = Pass == 0 ? Size : Size * 0.55f;
+		const float PassAlpha = Pass == 0 ? Alpha : Alpha * 0.70f;
+		const float ArmW = std::max(0.5f, PassSize * 0.10f);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, PassAlpha);
+		for(int i = 0; i < 6; ++i)
+		{
+			const float Angle = AngleDeg * 0.0174533f + i * 0.5235988f +
+					    (Pass == 1 ? 0.2617994f : 0.0f);
+			Graphics()->QuadsSetRotation(Angle);
+			IGraphics::CQuadItem Arm(X - ArmW * 0.5f, Y - PassSize * 0.5f, ArmW, PassSize);
+			Graphics()->QuadsDrawTL(&Arm, 1);
+		}
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderSnowflakePattern(CUIRect Area, float Alpha)
+{
+	if(Area.w < 40.0f || Area.h < 40.0f || Alpha <= 0.0f)
+		return;
+	static const float s_aFlakes[][5] = {
+		// fx, fy, размер, угол, яркость
+		{0.055f, 0.085f, 24.0f, 12.0f, 1.0f},
+		{0.175f, 0.220f, 13.0f, 47.0f, 0.8f},
+		{0.335f, 0.075f, 17.0f, 25.0f, 0.9f},
+		{0.520f, 0.155f, 11.0f, 60.0f, 0.7f},
+		{0.685f, 0.090f, 21.0f, 33.0f, 1.0f},
+		{0.845f, 0.205f, 14.0f, 8.0f, 0.8f},
+		{0.945f, 0.115f, 19.0f, 52.0f, 0.9f},
+		{0.075f, 0.415f, 15.0f, 70.0f, 0.8f},
+		{0.265f, 0.520f, 22.0f, 18.0f, 1.0f},
+		{0.470f, 0.455f, 12.0f, 40.0f, 0.7f},
+		{0.665f, 0.560f, 16.0f, 65.0f, 0.9f},
+		{0.875f, 0.500f, 24.0f, 30.0f, 1.0f},
+		{0.145f, 0.760f, 19.0f, 22.0f, 0.9f},
+		{0.360f, 0.835f, 13.0f, 58.0f, 0.8f},
+		{0.575f, 0.775f, 25.0f, 5.0f, 1.0f},
+		{0.775f, 0.855f, 15.0f, 44.0f, 0.8f},
+		{0.935f, 0.760f, 20.0f, 63.0f, 0.9f},
+		{0.045f, 0.925f, 14.0f, 36.0f, 0.8f},
+		{0.300f, 0.945f, 11.0f, 71.0f, 0.7f},
+		{0.520f, 0.905f, 17.0f, 28.0f, 0.9f},
+		{0.720f, 0.945f, 12.0f, 16.0f, 0.7f},
+		{0.925f, 0.915f, 16.0f, 49.0f, 0.8f},
+	};
+	for(const auto &F : s_aFlakes)
+	{
+		NyRenderSnowflakeAt(Area.x + Area.w * F[0], Area.y + Area.h * F[1],
+			F[2], Alpha * 0.105f * F[4], F[3]);
+	}
+	// мелкая снежная пыль
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < 56; ++i)
+	{
+		const float Fx = std::fmod(i * 0.617f, 1.0f);
+		const float Fy = std::fmod(i * 0.417f + 0.23f, 1.0f);
+		const float R = 0.7f + 1.4f * std::fmod(i * 0.811f, 1.0f);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha * 0.09f);
+		Graphics()->DrawCircle(Area.x + Area.w * Fx, Area.y + Area.h * Fy, R, 6);
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderFallingSnow(CUIRect Area, int Count, float Alpha)
+{
+	if(Area.w < 20.0f || Area.h < 20.0f || Count <= 0 || Alpha <= 0.0f)
+		return;
+	static float s_aFx[160];
+	static float s_aSpeed[160];
+	static float s_aSize[160];
+	static float s_aPhase[160];
+	static bool s_Init = false;
+	if(!s_Init)
+	{
+		s_Init = true;
+		for(int i = 0; i < 160; ++i)
+		{
+			s_aFx[i] = std::fmod(i * 0.7369f, 1.0f);
+			s_aSpeed[i] = 0.055f + 0.110f * std::fmod(i * 0.3173f, 1.0f);
+			s_aSize[i] = 0.8f + 2.0f * std::fmod(i * 0.5717f, 1.0f);
+			s_aPhase[i] = std::fmod(i * 0.9137f, 1.0f) * 6.2831853f;
+		}
+	}
+	const float Time = Client()->LocalTime();
+	const int N = std::min(Count, 160);
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < N; ++i)
+	{
+		const float Fy = std::fmod(s_aSpeed[i] * Time * 0.032f + s_aFx[i] * 7.31f, 1.0f);
+		const float X = Area.x + Area.w * s_aFx[i] +
+				7.0f * std::sin(Time * (0.5f + s_aSpeed[i] * 2.0f) + s_aPhase[i]);
+		const float Y = Area.y + Area.h * Fy;
+		const float DepthFade = 0.35f + 0.65f * (s_aSize[i] / 2.8f);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha * DepthFade);
+		Graphics()->DrawCircle(X, Y, s_aSize[i], 6);
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderSnowCap(CUIRect TopEdge, float Height, float Alpha)
+{
+	if(TopEdge.w < 4.0f || Height < 0.5f)
+		return;
+	const float ScaleH = std::clamp(TopEdge.h / 28.0f, 0.8f, 1.6f);
+	CUIRect Cap = TopEdge;
+	Cap.h = std::min(Height, TopEdge.h * 0.5f);
+	Cap.Draw(ColorRGBA(0.93f, 0.96f, 1.0f, Alpha), IGraphics::CORNER_T, std::min(Cap.h, 5.0f));
+	static const float s_aBumpX[] = {0.06f, 0.18f, 0.31f, 0.45f, 0.58f, 0.71f, 0.84f, 0.95f};
+	static const float s_aBumpR[] = {1.5f, 2.3f, 1.8f, 2.6f, 1.9f, 2.4f, 1.7f, 2.0f};
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.95f, 0.97f, 1.0f, Alpha);
+	for(size_t i = 0; i < std::size(s_aBumpX); ++i)
+	{
+		Graphics()->DrawCircle(TopEdge.x + TopEdge.w * s_aBumpX[i], TopEdge.y + 0.5f,
+			s_aBumpR[i] * ScaleH * (TopEdge.w < 60.0f ? 0.8f : 1.0f), 8);
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderIcicles(CUIRect TopEdge, float MaxLen, float Alpha)
+{
+	if(TopEdge.w < 24.0f || MaxLen < 2.0f)
+		return;
+	Graphics()->QuadsBegin();
+	const float Step = 15.0f;
+	const int Count = (int)(TopEdge.w / Step);
+	for(int i = 0; i <= Count; ++i)
+	{
+		const float Seed = std::fmod(i * 0.618034f, 1.0f);
+		const float X = TopEdge.x + 2.0f + i * Step;
+		if(X > TopEdge.x + TopEdge.w - 2.0f)
+			break;
+		const float Len = MaxLen * (0.30f + 0.70f * Seed);
+		const float W = 2.0f + 1.8f * std::fmod(Seed * 7.31f, 1.0f);
+		const int Segs = 5;
+		for(int s = 0; s < Segs; ++s)
+		{
+			const float T0 = (float)s / Segs;
+			const float T1 = (float)(s + 1) / Segs;
+			const float W0 = W * (1.0f - T0 * 0.92f);
+			const float W1 = W * (1.0f - T1 * 0.92f);
+			const float Fade = (1.0f - T0 * 0.55f);
+			Graphics()->SetColor(0.82f, 0.92f, 1.0f, Alpha * 0.55f * Fade);
+			IGraphics::CQuadItem Seg(X - std::max(W0, W1) * 0.5f, TopEdge.y + Len * T0,
+				std::max(W0, W1) + 0.01f, Len / Segs + 0.05f);
+			Graphics()->QuadsDrawTL(&Seg, 1);
+		}
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderBauble(vec2 Attach, float Radius, float HangLen, const ColorRGBA &Color, float Alpha)
+{
+	if(Radius < 1.0f)
+		return;
+	const float Cy = Attach.y + HangLen + Radius;
+	// нить
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.85f, 0.80f, 0.60f, 0.75f * Alpha);
+	IGraphics::CQuadItem String(Attach.x - 0.4f, Attach.y, 0.8f, HangLen);
+	Graphics()->QuadsDrawTL(&String, 1);
+	Graphics()->QuadsEnd();
+	// колпачок
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.85f, 0.68f, 0.25f, Alpha);
+	IGraphics::CQuadItem Cap(Attach.x - Radius * 0.45f, Attach.y + HangLen, Radius * 0.9f, Radius * 0.55f);
+	Graphics()->QuadsDrawTL(&Cap, 1);
+	Graphics()->QuadsEnd();
+	// шар
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(Color.r, Color.g, Color.b, Alpha);
+	Graphics()->DrawCircle(Attach.x, Cy, Radius, 14);
+	Graphics()->QuadsEnd();
+	// блик
+	Graphics()->BlendAdditive();
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.35f * Alpha);
+	Graphics()->DrawCircle(Attach.x - Radius * 0.35f, Cy - Radius * 0.35f, Radius * 0.28f, 8);
+	Graphics()->QuadsEnd();
+	Graphics()->BlendNormal();
+}
+
+void CMenus::NyRenderHolly(CUIRect At, float Size, float AngleDeg, bool Flip, float Alpha)
+{
+	if(Size < 2.0f)
+		return;
+	const float CX = At.x + At.w * 0.5f;
+	const float CY = At.y + At.h * 0.5f;
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < 5; ++i)
+	{
+		const float Ang = AngleDeg * 0.0174533f +
+				  i * 1.2566371f + (Flip ? 0.4f : 0.0f);
+		const float LeafLen = Size * (0.55f + 0.32f * std::fmod(i * 0.71f, 1.0f));
+		const float LeafW = LeafLen * 0.48f;
+		Graphics()->QuadsSetRotation(Ang);
+		const float Lx = CX + std::sin(Ang) * LeafLen * 0.45f;
+		const float Ly = CY - std::cos(Ang) * LeafLen * 0.45f;
+		if(i % 2 == 0)
+			Graphics()->SetColor(0.045f, 0.290f, 0.115f, Alpha);
+		else
+			Graphics()->SetColor(0.075f, 0.360f, 0.145f, Alpha);
+		IGraphics::CQuadItem Leaf(Lx - LeafW * 0.5f, Ly - LeafLen * 0.5f, LeafW, LeafLen);
+		Graphics()->QuadsDrawTL(&Leaf, 1);
+	}
+	Graphics()->QuadsEnd();
+	Graphics()->QuadsBegin();
+	const float BerryR = std::max(1.2f, Size * 0.14f);
+	for(int i = 0; i < 3; ++i)
+	{
+		const float Ang = AngleDeg * 0.0174533f + i * 2.1f;
+		Graphics()->SetColor(0.86f, 0.10f, 0.14f, Alpha);
+		Graphics()->DrawCircle(CX + std::sin(Ang) * Size * 0.17f,
+			CY - std::cos(Ang) * Size * 0.17f + Size * 0.06f, BerryR, 10);
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderPineSprig(CUIRect At, float Size, float AngleDeg, bool Flip, float Alpha)
+{
+	if(Size < 2.0f)
+		return;
+	const float CX = At.x + At.w * 0.5f;
+	const float CY = At.y + At.h * 0.5f;
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < 9; ++i)
+	{
+		const float Seed = std::fmod(i * 0.617f + (Flip ? 0.31f : 0.0f), 1.0f);
+		const float Ang = AngleDeg * 0.0174533f +
+				  (i - 4) * 0.26f + (Seed - 0.5f) * 0.22f;
+		const float Spread = 1.0f - std::abs(i - 4) / 4.5f;
+		const float Len = Size * (0.45f + 0.55f * Spread) * (0.80f + 0.40f * Seed);
+		const float NW = 1.2f + 0.6f * Seed;
+		Graphics()->QuadsSetRotation(Ang);
+		const float NeedleX = CX + std::sin(Ang) * Len * 0.45f;
+		const float NeedleY = CY - std::cos(Ang) * Len * 0.45f;
+		Graphics()->SetColor(0.030f + 0.045f * Seed, 0.150f + 0.105f * Seed,
+			0.075f + 0.055f * Seed, Alpha);
+		IGraphics::CQuadItem Needle(NeedleX - NW * 0.5f, NeedleY - Len * 0.5f, NW, Len);
+		Graphics()->QuadsDrawTL(&Needle, 1);
+	}
+	Graphics()->QuadsEnd();
+}
+
+void CMenus::NyRenderGarland(CUIRect Area, float Alpha)
+{
+	if(Area.w < 24.0f)
+		return;
+	const float Time = Client()->LocalTime();
+
+	// еловые ветки: два слоя вееров иголок вдоль верхней кромки
+	for(int Layer = 0; Layer < 2; ++Layer)
+	{
+		const float Step = Layer == 0 ? 12.0f : 8.5f;
+		const float YBase = Area.y + (Layer == 0 ? 2.5f : 5.5f);
+		const float NeedleMax = Layer == 0 ? 12.5f : 8.5f;
+		Graphics()->QuadsBegin();
+		for(float X = Area.x - 6.0f; X < Area.x + Area.w + 6.0f; X += Step)
+		{
+			const float Seed = std::fmod(X * 0.037f + Layer * 0.618f, 1.0f);
+			for(int n = -1; n <= 1; ++n)
+			{
+				const float Ang = (Seed - 0.5f) * 1.6f + n * 0.62f +
+						  (Layer == 1 ? 0.40f : 0.0f);
+				const float Len = NeedleMax * (0.60f + 0.50f *
+					std::fmod(Seed * 5.13f + (n + 1) * 0.29f, 1.0f));
+				const float NW = 1.5f;
+				Graphics()->QuadsSetRotation(Ang);
+				if(Layer == 0)
+					Graphics()->SetColor(0.020f, 0.085f, 0.048f, Alpha);
+				else
+					Graphics()->SetColor(0.045f, 0.150f, 0.082f, Alpha);
+				IGraphics::CQuadItem Needle(X - NW * 0.5f, YBase - Len * 0.5f, NW, Len);
+				Graphics()->QuadsDrawTL(&Needle, 1);
+			}
+		}
+		Graphics()->QuadsEnd();
+	}
+
+	// огоньки: цветные лампочки вдоль волны, аддитивное свечение
+	const int LightCount = (int)(Area.w / 44.0f) + 2;
+	static const ColorRGBA s_aNyLights[] = {
+		ColorRGBA(1.00f, 0.30f, 0.28f, 1.0f),
+		ColorRGBA(1.00f, 0.66f, 0.22f, 1.0f),
+		ColorRGBA(1.00f, 0.88f, 0.36f, 1.0f),
+		ColorRGBA(0.45f, 0.95f, 0.50f, 1.0f),
+		ColorRGBA(0.42f, 0.72f, 1.00f, 1.0f),
+		ColorRGBA(1.00f, 0.60f, 0.85f, 1.0f),
+	};
+	Graphics()->BlendAdditive();
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < LightCount; ++i)
+	{
+		const float T = (float)i / (float)(LightCount - 1);
+		const float X = Area.x + 6.0f + T * (Area.w - 12.0f);
+		const float Y = NyGarlandLightY(Area, X, Time);
+		const ColorRGBA &Col = s_aNyLights[i % (int)std::size(s_aNyLights)];
+		Graphics()->SetColor(Col.r, Col.g, Col.b, 0.16f * Alpha);
+		Graphics()->DrawCircle(X, Y, 7.5f, 12);
+		Graphics()->SetColor(Col.r, Col.g, Col.b, 0.10f * Alpha);
+		Graphics()->DrawCircle(X, Y, 12.5f, 12);
+	}
+	Graphics()->QuadsEnd();
+	Graphics()->BlendNormal();
+	Graphics()->QuadsBegin();
+	for(int i = 0; i < LightCount; ++i)
+	{
+		const float T = (float)i / (float)(LightCount - 1);
+		const float X = Area.x + 6.0f + T * (Area.w - 12.0f);
+		const float Y = NyGarlandLightY(Area, X, Time);
+		const ColorRGBA &Col = s_aNyLights[i % (int)std::size(s_aNyLights)];
+		Graphics()->SetColor(Col.r, Col.g, Col.b, Alpha);
+		Graphics()->DrawCircle(X, Y, 1.9f, 10);
+		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 0.75f * Alpha);
+		Graphics()->DrawCircle(X, Y - 0.6f, 0.7f, 6);
+	}
+	Graphics()->QuadsEnd();
+
+	// шары на гирлянде
+	NyRenderBauble(vec2(Area.x + Area.w * 0.18f,
+			    NyGarlandLightY(Area, Area.x + Area.w * 0.18f, Time)),
+		5.5f, 12.0f, ColorRGBA(0.80f, 0.10f, 0.14f, 1.0f), Alpha);
+	NyRenderBauble(vec2(Area.x + Area.w * 0.74f,
+			    NyGarlandLightY(Area, Area.x + Area.w * 0.74f, Time)),
+		4.8f, 10.0f, ColorRGBA(0.16f, 0.44f, 0.22f, 1.0f), Alpha);
+}
+
+void CMenus::NyRenderSantaHat(CUIRect At, float Alpha)
+{
+	if(At.w < 4.0f || At.h < 4.0f)
+		return;
+	const float CX = At.x + At.w * 0.5f;
+	const float BaseY = At.y + At.h;
+	const float ConeH = At.h * 0.92f;
+	const float ConeBaseW = At.w * 0.60f;
+	const float Tilt = -0.42f;
+	// красный конус
+	Graphics()->QuadsBegin();
+	for(int s = 0; s < 6; ++s)
+	{
+		const float T0 = (float)s / 6.0f;
+		const float T1 = (float)(s + 1) / 6.0f;
+		const float W0 = ConeBaseW * (1.0f - T0 * 0.82f);
+		const float W1 = ConeBaseW * (1.0f - T1 * 0.82f);
+		const float Y0 = BaseY - At.h * 0.14f - ConeH * T0;
+		const float Y1 = BaseY - At.h * 0.14f - ConeH * T1;
+		const float X0 = CX + Tilt * ConeH * T0;
+		const float X1 = CX + Tilt * ConeH * T1;
+		Graphics()->SetColor(0.80f, 0.11f, 0.17f, Alpha);
+		IGraphics::CQuadItem Seg(std::min(X0 - W0 * 0.5f, X1 - W1 * 0.5f), Y1,
+			std::max(W0, W1) + std::abs(X0 - X1) + 0.01f, Y0 - Y1 + 0.05f);
+		Graphics()->QuadsDrawTL(&Seg, 1);
+	}
+	Graphics()->QuadsEnd();
+	// белая опушка
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.94f, 0.96f, 1.0f, Alpha);
+	IGraphics::CQuadItem Band(CX - ConeBaseW * 0.68f, BaseY - At.h * 0.17f,
+		ConeBaseW * 1.36f, At.h * 0.19f);
+	Graphics()->QuadsDrawTL(&Band, 1);
+	Graphics()->QuadsEnd();
+	// помпон
+	Graphics()->QuadsBegin();
+	Graphics()->SetColor(0.97f, 0.98f, 1.0f, Alpha);
+	Graphics()->DrawCircle(CX + Tilt * ConeH, BaseY - At.h * 0.14f - ConeH, At.h * 0.17f, 10);
+	Graphics()->QuadsEnd();
+}
+
+// Новогодняя страница настроек: рисуется для ВСЕХ вкладок, кроме
+// KernelNet (он идёт прежним путём в RenderSettings — там золотой
+// стиль из v1.1.4, вкладка Melancholy выглядит по-другому).
+void CMenus::NyRenderSettingsPage(CUIRect MainView)
+{
+	// Зелёное стекло виджетов страницы (как на референсе): временно
+	// включаем тему Emerald и возвращаем выбор пользователя в конце.
+	const int RealTheme = g_Config.m_ClZzTheme;
+	g_Config.m_ClZzTheme = 3;
+
+	const ColorRGBA NyGlassRim(0.50f, 0.85f, 0.62f, 0.32f);
+	const ColorRGBA NySidebarFill(0.014f, 0.070f, 0.043f, 0.87f);
+	const ColorRGBA NyContentFill(0.018f, 0.082f, 0.052f, 0.89f);
+	const ColorRGBA NyHeaderFill(0.050f, 0.185f, 0.105f, 0.90f);
+
+	Graphics()->PostProcess(0.0f, 1.0f, 0.35f, 1.0f, 1.0f, 1.0f,
+		0.0f, 0.0f, 1.0f, -0.46f, 1.0f);
+
+	// зелёный полумрак поверх фона меню + снег за панелями
+	CUIRect ScreenNy = *Ui()->Screen();
+	ScreenNy.Draw(ColorRGBA(0.012f, 0.055f, 0.034f, 0.48f), IGraphics::CORNER_NONE, 0.0f);
+	NyRenderFallingSnow(ScreenNy, 64, 0.26f);
+
+	MainView.Margin(11.0f, &MainView);
+	CUIRect Button, TabBar, RestartBar;
+	CUIRect ContentCard, SidebarCard;
+	MainView.VSplitLeft(174.0f, &SidebarCard, &ContentCard);
+	ContentCard.VSplitLeft(12.0f, nullptr, &ContentCard);
+
+	// панель содержимого: зелёное стекло + узор снежинок
+	ContentCard.Draw(NyGlassRim, IGraphics::CORNER_ALL, 40.0f);
+	CUIRect ContentSurface = ContentCard;
+	ContentSurface.Margin(1.0f, &ContentSurface);
+	ContentSurface.Draw(NyContentFill, IGraphics::CORNER_ALL, 39.0f);
+	NyRenderSnowflakePattern(ContentSurface, 1.0f);
+	NyRenderSnowCap(ContentSurface, 6.0f, 0.85f);
+	NyRenderIcicles(ContentSurface, 13.0f, 0.40f);
+
+	// сайдбар: зелёное стекло, иней по верхней кромке
+	SidebarCard.Draw(NyGlassRim, IGraphics::CORNER_ALL, 40.0f);
+	CUIRect SidebarSurface = SidebarCard;
+	SidebarSurface.Margin(1.0f, &SidebarSurface);
+	SidebarSurface.Draw(NySidebarFill, IGraphics::CORNER_ALL, 39.0f);
+	NyRenderSnowCap(SidebarSurface, 6.0f, 0.85f);
+
+	MainView = ContentSurface;
+	MainView.Margin(22.0f, &MainView);
+	TabBar = SidebarSurface;
+	TabBar.Margin(9.0f, &TabBar);
+	CUIRect SettingsHeader;
+	TabBar.HSplitTop(42.0f, &SettingsHeader, &TabBar);
+	SettingsHeader.Draw(NyHeaderFill, IGraphics::CORNER_ALL, 24.0f);
+	Ui()->DoLabel(&SettingsHeader, Localize("Settings"), 17.0f, TEXTALIGN_MC);
+	NyRenderSnowCap(SettingsHeader, 5.0f, 0.95f);
+
+	const bool NeedRestart =
+		m_NeedRestartGraphics || m_NeedRestartSound || m_NeedRestartUpdate;
+	if(NeedRestart)
+	{
+		MainView.HSplitBottom(20.0f, &MainView, &RestartBar);
+		MainView.HSplitBottom(10.0f, &MainView, nullptr);
+	}
+
+	static const int s_aNyPages[] = {
+		SETTINGS_LANGUAGE,
+		SETTINGS_GENERAL,
+		SETTINGS_PLAYER,
+		SETTINGS_TEE,
+		SETTINGS_APPEARANCE,
+		SETTINGS_CONTROLS,
+		SETTINGS_GRAPHICS,
+		SETTINGS_SOUND,
+		SETTINGS_DDNET,
+		SETTINGS_ASSETS,
+		SETTINGS_TCLIENT,
+		SETTINGS_PROFILES,
+		SETTINGS_KERNELNET,
+	};
+	static const char *s_apNyTabs[] = {
+		Localize("Language"),
+		Localize("General"),
+		Localize("Player"),
+		Localize("Tee"),
+		Localize("Appearance"),
+		Localize("Controls"),
+		Localize("Graphics"),
+		Localize("Sound"),
+		Localize("DDNet"),
+		Localize("Assets"),
+		Localize("TClient"),
+		Localize("Profiles"),
+		Localize("Melancholy"),
+	};
+	static CButtonContainer s_aNyTabButtons[(int)std::size(s_aNyPages)];
+
+	// Новогодняя вкладка: зелёное стекло со снегом; активная горит
+	// красным («тлеющее» стекло с ореолом) — как на референсе.
+	const auto DoNyTab = [&](CButtonContainer *pTab, CUIRect TabRect, const char *pText, bool Checked) {
+		const bool MouseInside = Ui()->HotItem() == pTab;
+		CUIRect Rect = TabRect;
+		if(Checked)
+		{
+			Graphics()->BlendAdditive();
+			Graphics()->QuadsBegin();
+			Graphics()->SetColor(0.95f, 0.30f, 0.18f, 0.10f);
+			Graphics()->DrawCircle(Rect.x + Rect.w * 0.5f, Rect.y + Rect.h * 0.5f, Rect.h * 1.9f, 16);
+			Graphics()->SetColor(1.00f, 0.55f, 0.30f, 0.07f);
+			Graphics()->DrawCircle(Rect.x + Rect.w * 0.5f, Rect.y + Rect.h * 0.5f, Rect.h * 2.6f, 16);
+			Graphics()->QuadsEnd();
+			Graphics()->BlendNormal();
+			Rect.Draw(ColorRGBA(1.00f, 0.50f, 0.36f, 0.85f), IGraphics::CORNER_ALL, 14.0f);
+			CUIRect InnerRed = Rect;
+			InnerRed.Margin(0.9f, &InnerRed);
+			InnerRed.Draw(ColorRGBA(0.82f, 0.14f, 0.16f, 0.94f), IGraphics::CORNER_ALL, 13.1f);
+		}
+		else
+		{
+			const ColorRGBA Rim = MouseInside ? ColorRGBA(0.65f, 0.95f, 0.70f, 0.50f) : ColorRGBA(0.55f, 0.85f, 0.65f, 0.30f);
+			Rect.Draw(Rim, IGraphics::CORNER_ALL, 14.0f);
+			CUIRect Inner = Rect;
+			Inner.Margin(0.9f, &Inner);
+			Inner.Draw(MouseInside ? ColorRGBA(0.075f, 0.265f, 0.155f, 0.92f) : ColorRGBA(0.032f, 0.150f, 0.088f, 0.90f), IGraphics::CORNER_ALL, 13.1f);
+		}
+		CUIRect Label = Rect;
+		Label.HMargin(2.0f, &Label);
+		TextRender()->TextColor(Checked ? ColorRGBA(1.0f, 0.97f, 0.95f, 1.0f) : ColorRGBA(0.93f, 0.98f, 0.94f, 1.0f));
+		Ui()->DoLabel(&Label, pText, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		return Ui()->DoButtonLogic(pTab, Checked ? 1 : 0, &TabRect, BUTTONFLAG_LEFT);
+	};
+
+	// Вкладка Melancholy (KernelNet) — золотая, без снега: выглядит
+	// по-другому, как и сама страница (золотой стиль v1.1.4).
+	const auto DoNyGoldTab = [&](CButtonContainer *pTab, CUIRect TabRect, const char *pText, bool Checked) {
+		const bool MouseInside = Ui()->HotItem() == pTab;
+		CUIRect Rect = TabRect;
+		if(Checked)
+		{
+			Rect.Draw(ColorRGBA(0.99f, 0.82f, 0.40f, 0.85f), IGraphics::CORNER_ALL, 14.0f);
+			CUIRect InnerGold = Rect;
+			InnerGold.Margin(0.9f, &InnerGold);
+			InnerGold.Draw(ColorRGBA(0.52f, 0.38f, 0.10f, 0.94f), IGraphics::CORNER_ALL, 13.1f);
+		}
+		else
+		{
+			Rect.Draw(ColorRGBA(0.99f, 0.78f, 0.32f, MouseInside ? 0.70f : 0.38f), IGraphics::CORNER_ALL, 14.0f);
+			CUIRect InnerGold = Rect;
+			InnerGold.Margin(0.9f, &InnerGold);
+			InnerGold.Draw(ColorRGBA(0.10f, 0.075f, 0.030f, 0.92f), IGraphics::CORNER_ALL, 13.1f);
+		}
+		CUIRect Label = Rect;
+		Label.HMargin(2.0f, &Label);
+		TextRender()->TextColor(ColorRGBA(0.99f, 0.88f, 0.55f, 1.0f));
+		Ui()->DoLabel(&Label, pText, Label.h * CUi::ms_FontmodHeight, TEXTALIGN_MC);
+		TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		return Ui()->DoButtonLogic(pTab, Checked ? 1 : 0, &TabRect, BUTTONFLAG_LEFT);
+	};
+
+	bool MainPageSelected = false;
+	for(int i = 0; i < (int)std::size(s_aNyPages); i++)
+	{
+		TabBar.HSplitTop(3.0f, nullptr, &TabBar);
+		TabBar.HSplitTop(28.0f, &Button, &TabBar);
+		const int Page = s_aNyPages[i];
+		if(g_Config.m_UiSettingsPage == Page)
+			MainPageSelected = true;
+		const bool Checked = g_Config.m_UiSettingsPage == Page;
+		bool Clicked = false;
+		if(Page == SETTINGS_KERNELNET)
+		{
+			Clicked = DoNyGoldTab(&s_aNyTabButtons[i], Button, s_apNyTabs[i], Checked);
+		}
+		else
+		{
+			Clicked = DoNyTab(&s_aNyTabButtons[i], Button, s_apNyTabs[i], Checked);
+			// шапка снега на вкладке
+			NyRenderSnowCap(Button, 5.0f, Checked ? 0.95f : 0.80f);
+			// омела у концов вкладки, стороны чередуются
+			CUIRect HollyAt;
+			HollyAt.w = 9.0f;
+			HollyAt.h = 9.0f;
+			HollyAt.y = Button.y - 2.5f;
+			HollyAt.x = (i % 2 == 0) ? Button.x + Button.w - 10.0f : Button.x + 1.5f;
+			NyRenderHolly(HollyAt, 10.0f, 25.0f + 45.0f * (i % 3), i % 2 == 1, 0.92f);
+		}
+		if(Clicked)
+		{
+			g_Config.m_UiSettingsPage = Page;
+			MainPageSelected = true;
+		}
+	}
+	if(g_Config.m_ClZzHideKernelNetSettings &&
+		g_Config.m_UiSettingsPage == SETTINGS_KERNELNET)
+		g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+	else if(!MainPageSelected)
+		g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+
+	// ёлочные шары, свисающие у правого края сайдбара
+	NyRenderBauble(vec2(SidebarSurface.x + SidebarSurface.w - 3.0f,
+			    SidebarSurface.y + 46.0f),
+		6.0f, 22.0f, ColorRGBA(0.80f, 0.10f, 0.14f, 1.0f), 1.0f);
+	NyRenderBauble(vec2(SidebarSurface.x + SidebarSurface.w - 9.0f,
+			    SidebarSurface.y + 54.0f),
+		4.6f, 16.0f, ColorRGBA(0.16f, 0.44f, 0.22f, 1.0f), 1.0f);
+
+	if(g_Config.m_UiSettingsPage == SETTINGS_LANGUAGE)
+	{
+		RenderLanguageSettings(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_GENERAL)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_GENERAL);
+		RenderSettingsGeneral(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_PLAYER)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_PLAYER);
+		RenderSettingsPlayer(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_TEE)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_TEE);
+		if(Client()->IsSixup())
+			RenderSettingsTee7(MainView);
+		else
+			RenderSettingsTee(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_APPEARANCE)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_APPEARANCE);
+		RenderSettingsAppearance(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_CONTROLS)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_CONTROLS);
+		m_MenusSettingsControls.Render(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_GRAPHICS)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_GRAPHICS);
+		RenderSettingsGraphics(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_SOUND)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_SOUND);
+		RenderSettingsSound(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_DDNET)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_DDNET);
+		RenderSettingsDDNet(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_ASSETS)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_ASSETS);
+		RenderSettingsCustom(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_TCLIENT)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_RESERVED0);
+		RenderSettingsTClient(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_PROFILES)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_RESERVED0);
+		RenderSettingsTClientProfiles(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_CONFIGS)
+	{
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_RESERVED0);
+		RenderSettingsTClientConfigs(MainView);
+	}
+	else if(g_Config.m_UiSettingsPage == SETTINGS_KERNELNET)
+	{
+		// Переход на страницу Melancholy: контент золотой страницы
+		// рисуется сразу, полностью прежний вид — со следующего кадра
+		// (RenderSettings уходит в старую ветку целиком).
+		GameClient()->m_MenuBackground.ChangePosition(
+			CMenuBackground::POS_SETTINGS_RESERVED1);
+		RenderSettingsKernelNet(MainView);
+	}
+	else
+	{
+		g_Config.m_UiSettingsPage = SETTINGS_GENERAL;
+	}
+
+	// декор поверх содержимого: снег, еловые лапки и омела по углам
+	// («по бокам» — как на референсе)
+	NyRenderFallingSnow(ContentSurface, 30, 0.15f);
+	CUIRect NyCorner;
+	NyCorner.x = ContentSurface.x + 4.0f;
+	NyCorner.y = ContentSurface.y + ContentSurface.h - 30.0f;
+	NyCorner.w = 34.0f;
+	NyCorner.h = 28.0f;
+	NyRenderPineSprig(NyCorner, 24.0f, -25.0f, false, 1.0f);
+	NyCorner.x = ContentSurface.x + 24.0f;
+	NyCorner.y = ContentSurface.y + ContentSurface.h - 20.0f;
+	NyCorner.w = 18.0f;
+	NyCorner.h = 18.0f;
+	NyRenderHolly(NyCorner, 13.0f, 15.0f, false, 1.0f);
+	NyCorner.x = ContentSurface.x + ContentSurface.w - 36.0f;
+	NyCorner.y = ContentSurface.y + ContentSurface.h - 30.0f;
+	NyCorner.w = 34.0f;
+	NyCorner.h = 28.0f;
+	NyRenderPineSprig(NyCorner, 24.0f, -25.0f, true, 1.0f);
+	NyCorner.x = ContentSurface.x + ContentSurface.w - 24.0f;
+	NyCorner.y = ContentSurface.y + ContentSurface.h - 20.0f;
+	NyCorner.w = 18.0f;
+	NyCorner.h = 18.0f;
+	NyRenderHolly(NyCorner, 13.0f, 200.0f, true, 1.0f);
+	// еловые лапки сверху по бокам панели содержимого
+	NyCorner.x = ContentSurface.x + 6.0f;
+	NyCorner.y = ContentSurface.y + 2.0f;
+	NyCorner.w = 28.0f;
+	NyCorner.h = 18.0f;
+	NyRenderPineSprig(NyCorner, 17.0f, 150.0f, false, 0.95f);
+	NyCorner.x = ContentSurface.x + ContentSurface.w - 34.0f;
+	NyCorner.y = ContentSurface.y + 2.0f;
+	NyCorner.w = 28.0f;
+	NyCorner.h = 18.0f;
+	NyRenderPineSprig(NyCorner, 17.0f, 210.0f, true, 0.95f);
+	// еловая лапка и омела внизу сайдбара
+	NyCorner.x = SidebarSurface.x + 2.0f;
+	NyCorner.y = SidebarSurface.y + SidebarSurface.h - 26.0f;
+	NyCorner.w = 30.0f;
+	NyCorner.h = 24.0f;
+	NyRenderPineSprig(NyCorner, 20.0f, -35.0f, false, 1.0f);
+	NyCorner.x = SidebarSurface.x + 20.0f;
+	NyCorner.y = SidebarSurface.y + SidebarSurface.h - 18.0f;
+	NyCorner.w = 16.0f;
+	NyCorner.h = 16.0f;
+	NyRenderHolly(NyCorner, 12.0f, 10.0f, false, 1.0f);
+
+	if(NeedRestart)
+	{
+		CUIRect RestartWarning, RestartButton;
+		RestartBar.VSplitRight(125.0f, &RestartWarning, &RestartButton);
+		RestartWarning.VSplitRight(10.0f, &RestartWarning, nullptr);
+		if(m_NeedRestartUpdate)
+		{
+			TextRender()->TextColor(1.0f, 0.4f, 0.4f, 1.0f);
+			Ui()->DoLabel(
+				&RestartWarning,
+				Localize("DDNet Client needs to be restarted to complete update!"),
+				14.0f, TEXTALIGN_ML);
+			TextRender()->TextColor(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+		else
+		{
+			Ui()->DoLabel(
+				&RestartWarning,
+				Localize(
+					"You must restart the game for all settings to take effect."),
+				14.0f, TEXTALIGN_ML);
+		}
+
+		static CButtonContainer s_RestartButton;
+		if(DoButton_Menu(&s_RestartButton, Localize("Restart"), 0,
+			   &RestartButton))
+		{
+			if(Client()->State() == IClient::STATE_ONLINE ||
+				GameClient()->Editor()->HasUnsavedData())
+			{
+				m_Popup = POPUP_RESTART;
+			}
+			else
+			{
+				Client()->Restart();
+			}
+		}
+	}
+
+	// возвращаем выбранную пользователем тему
+	g_Config.m_ClZzTheme = RealTheme;
+}
+
+'''
+
+sub("src/game/client/components/menus_settings.cpp",
+    "void CMenus::RenderSettings(CUIRect MainView)\n{\n",
+    NY_SETTINGS_CPP +
+    "void CMenus::RenderSettings(CUIRect MainView)\n{\n"
+    "\t// Melancholy v1.1.5: все вкладки, кроме KernelNet, рисуются в\n"
+    "\t// новогоднем стиле (гирлянда, снег, красная подсветка вкладок).\n"
+    "\t// Страница KernelNet (Melancholy) идёт прежним путём — она\n"
+    "\t// выглядит по-другому (золотой стиль v1.1.4).\n"
+    "\tif(g_Config.m_UiSettingsPage != SETTINGS_KERNELNET)\n"
+    "\t{\n"
+    "\t\tNyRenderSettingsPage(MainView);\n"
+    "\t\treturn;\n"
+    "\t}\n",
+    "menus_settings.cpp: новогодние вкладки настроек + страница (v1.1.5)")
 
 # ---------------------------------------------------------------- отчёт
 print("== patch_melancholy: применено %d, ошибок %d" % (len(OK), len(FAIL)))
