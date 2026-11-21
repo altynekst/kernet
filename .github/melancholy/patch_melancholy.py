@@ -5695,7 +5695,7 @@ sub('src/engine/client/backend/vulkan/backend_vulkan.cpp', r'''SetError(EGfxErro
 ''', r'''SetError(EGfxErrorType::GFX_ERROR_TYPE_INIT, "Allocating thread command buffers failed.");
 					return false;
 				}
-
+			}
 
 			// melancholy
 			m_vFrameBlendCommandBuffers.resize(m_SwapChainImageCount);
