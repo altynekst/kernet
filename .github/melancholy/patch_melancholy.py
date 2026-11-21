@@ -13,6 +13,19 @@ patch_melancholy.py — порт КРХ-авойда (OpenKrx) из Nullcki в m
   6) патчит мир предсказания (физика KRX: смерть/телепорты/файер-дилей/взрывы)
   7) вшивает цепочку Avoid в SnapInput (как в Nullcki) + трассировка
      openkrx_avoid_dump + физический прыжок Rocket Save
+  14) v1.1.9: КРХ ЛОЖНЫЙ ПРИЦЕЛ (замена старого фейк-аима) +
+     САМОУБИЙСТВО ПРИ ПОПАДАНИИ В ФРИЗ + FLY BOT ИЗ T-APK:
+     старый «Fake Aim spinbot» (cl_zz_spinaim*, aether-kn) удалён
+     полностью (конфиги, логика в controls.cpp, UI в «Разном»);
+     вместо него — крх-порт CMediumBots::FakeAim (6 режимов Mouse
+     pos/Robot aim/Spinbot/Random/Fake angles/Aimbot troll aim,
+     Send always, Visible) в avoid/fake_aim.{h,cpp}, вшитый в цепочку
+     SnapInput после ClassicAvoid и до лазерного анфриза (порядок
+     Nullcki); Visible рисует тий по отправляемому прицелу
+     (players.cpp); Kill on freeze (CMiscFeatures::AfterAvoid) —
+     SendKill один раз за непрерывный фриз; Fly Bot из T-apk (Tater
+     Plus @ dcaa51d597) — m_FlyInfo + FlyBot/FlyBotUnGrabFastHook в
+     CControls, вызов в SnapInput 1:1 с T-apk, чекбокс в «Разном»
   13) v1.1.8: НОВЫЙ ГОД ВО ВСЁМ ИНТЕРФЕЙСЕ + фиолетовая подсветка
      удалена ПОЛНОСТЬЮ: GetZZThemePalette возвращает единственную
      новогоднюю палитру (зелёный акцент + золото + тёмно-зелёное
@@ -3662,6 +3675,591 @@ sub('src/game/client/components/tclient/zz_gameclient_theme.cpp',
     '\tif(g_Config.m_ClZzTheme != 0)\n\t\tg_Config.m_UiColor = color_cast<ColorHSLA>(Palette.m_Accent).Pack(true);',
     '\t// Melancholy v1.1.8: UiColor всегда новогодняя (без фиолетового).\n\tg_Config.m_UiColor = color_cast<ColorHSLA>(Palette.m_Accent).Pack(true);',
     'v1.1.8: ApplyZZTheme — UiColor всегда новогодняя (без условия)')
+
+# ---------------------------------------------------------------- 14. v1.1.9: крх ложный прицел (замена старого), суицид при фризе, Fly Bot из T-apk
+print("== 14. v1.1.9: Fake Aim (крх) + Kill on freeze + Fly Bot (T-apk)")
+
+# --- A. новые файлы: avoid/fake_aim.h + avoid/fake_aim.cpp (порт Nullcki @ 59e02c5)
+FAKE_AIM_H = """#ifndef GAME_CLIENT_AVOID_FAKE_AIM_H
+#define GAME_CLIENT_AVOID_FAKE_AIM_H
+
+#include <base/vmath.h>
+
+#include <generated/protocol.h>
+
+class CGameClient;
+
+namespace OpenKrx
+{
+\t// КРХ ложный прицел (CMediumBots::FakeAim из krx/bots.cpp) и самоубийство при
+\t// попадании в фриз (kill-on-freeze путь CMiscFeatures::AfterAvoid из
+\t// krx/misc.cpp) — порт Nullcki @ 59e02c5.
+\tclass CFakeAim
+\t{
+\t\tstruct CSlot
+\t\t{
+\t\t\tint m_ClientId = -1;
+\t\t\tvec2 m_RobotAim = vec2(0, 0);
+\t\t\tfloat m_SpinAngle = 0.0f;
+\t\t\tbool m_WasFrozen = false;
+\t\t};
+\t\t// Native globals/object fields are shared by the currently controlled
+\t\t// tee. Switching the active dummy does not create another set of locks.
+\t\tCSlot m_State{};
+
+\t\tstatic bool Playing(CGameClient *pGameClient, const CNetObj_PlayerInput &Input);
+\t\tstatic bool Spectating(CGameClient *pGameClient);
+\t\tstatic float RandomRadians();
+\t\tstatic int ClosestPlayer(CGameClient *pGameClient);
+
+\tpublic:
+\t\tvoid OnReset();
+\t\tCNetObj_PlayerInput FakeAim(CGameClient *pGameClient, CNetObj_PlayerInput Input);
+\t\tvoid AfterAvoid(CGameClient *pGameClient);
+\t\tstatic vec2 FakeAimVector(int Mode, int Speed, vec2 Mouse, const CNetObj_PlayerInput &Input,
+\t\t\tint PreviousHook, vec2 ClosestDirection, float MouseRadius,
+\t\t\tvec2 &RobotAim, float &SpinAngle, float RandomAngle);
+\t};
+}
+
+#endif
+"""
+
+FAKE_AIM_CPP = """/* КРХ ложный прицел + самоубийство при попадании в фриз — порт из
+   Nullcki @ 59e02c5: CMediumBots::FakeAim / CMediumBots::FakeAimVector
+   (krx/bots.cpp) и kill-on-freeze путь CMiscFeatures::AfterAvoid
+   (krx/misc.cpp). Тела методов перенесены из исходника построчно
+   (кроме помеченных адаптаций). */
+
+#include "fake_aim.h"
+
+#include "krx_compat.h"
+#include "rocket_save.h"
+
+#include <engine/client.h>
+#include <engine/shared/config.h>
+
+#include <game/client/gameclient.h>
+#include <game/client/prediction/entities/character.h>
+#include <game/client/prediction/gameworld.h>
+
+#include <random>
+
+namespace OpenKrx
+{
+\tnamespace
+\t{
+\t\tbool Playing(CGameClient *pGameClient, const CNetObj_PlayerInput &Input)
+\t\t{
+\t\t\treturn (Input.m_PlayerFlags & PLAYERFLAG_PLAYING) && pGameClient->Client()->State() == IClient::STATE_ONLINE;
+\t\t}
+
+\t\tbool Spectating(CGameClient *pGameClient)
+\t\t{
+\t\t\tconst int Id = pGameClient->m_aLocalIds[g_Config.m_ClDummy];
+\t\t\treturn Id < 0 || Id >= MAX_CLIENTS || !pGameClient->m_aClients[Id].m_Active ||
+\t\t\t       pGameClient->m_aClients[Id].m_Team == TEAM_SPECTATORS || pGameClient->m_Snap.m_SpecInfo.m_Active;
+\t\t}
+
+\t\tvoid Aim(CNetObj_PlayerInput &Input, vec2 Value)
+\t\t{
+\t\t\t// Original 0x1402ba070 mode1: write prepared aim only.
+\t\t\tInput.m_TargetX = (int)Value.x;
+\t\t\tInput.m_TargetY = (int)Value.y;
+\t\t}
+
+\t\tfloat RandomRadians()
+\t\t{
+\t\t\tstatic std::mt19937 s_Generator(std::random_device{}());
+\t\t\treturn std::uniform_real_distribution<float>(0.0f, 2.0f * pi)(s_Generator);
+\t\t}
+\t}
+
+\tvoid CFakeAim::OnReset()
+\t{
+\t\t// The original reset leaves these process-static locks/latches alive.
+\t}
+
+\tvec2 CFakeAim::FakeAimVector(int Mode, int Speed, vec2 Mouse, const CNetObj_PlayerInput &Input,
+\t\tint PreviousHook, vec2 ClosestDirection, float MouseRadius, vec2 &RobotAim, float &SpinAngle, float RandomAngle)
+\t{
+\t\t// Recovered 0x1402dcdd0: all six modes, including zero-speed spin and
+\t\t// the asymmetric robot latch, use truncation rather than rounding.
+\t\tswitch(Mode)
+\t\t{
+\t\tcase 0:
+\t\t\treturn vec2((int)Mouse.x, (int)Mouse.y);
+\t\tcase 1:
+\t\t\tif((Input.m_Hook != 1 || PreviousHook != 0) && !(Input.m_Fire & 1))
+\t\t\t\treturn RobotAim;
+\t\t\tRobotAim = vec2(Input.m_TargetX, Input.m_TargetY);
+\t\t\treturn RobotAim;
+\t\tcase 2:
+\t\t\tif(Speed == 0)
+\t\t\t\treturn vec2(0, 0);
+\t\t\tSpinAngle += (Speed * pi) / 99.9f;
+\t\t\tif(SpinAngle < 0.0f)
+\t\t\t\tSpinAngle += 2.0f * pi;
+\t\t\telse if(SpinAngle > 2.0f * pi)
+\t\t\t\tSpinAngle -= 2.0f * pi;
+\t\t\treturn QuantizedAim(direction(SpinAngle), MouseRadius);
+\t\tcase 3:
+\t\t\treturn QuantizedAim(direction(RandomAngle), MouseRadius);
+\t\tcase 4:
+\t\t\treturn vec2((int)-Mouse.x, (int)-Mouse.y);
+\t\tcase 5:
+\t\t\treturn QuantizedAim(ClosestDirection, MouseRadius);
+\t\tdefault:
+\t\t\treturn vec2(0, 0);
+\t\t}
+\t}
+
+\tint CFakeAim::ClosestPlayer(CGameClient *pGameClient)
+\t{
+\t\t// Адаптация: KrxGameWorld() исходника -> m_GameWorld (TAS в melancholy
+\t\t// не портирован); сигнатура упрощена до единственного вызова FakeAim
+\t\t// (ClosestPlayer(pGameClient)).
+\t\tconst int SourceId = pGameClient->m_aLocalIds[g_Config.m_ClDummy];
+\t\tif(SourceId < 0 || SourceId >= MAX_CLIENTS)
+\t\t\treturn -1;
+\t\tconst vec2 Position = pGameClient->m_LocalCharacterPos;
+\t\tconst auto &Own = pGameClient->m_aClients[SourceId];
+\t\tif(Own.m_Solo || Own.m_Spec || Own.m_HookHitDisabled)
+\t\t\treturn -1;
+\t\tfloat Best = 0.0f;
+\t\tint BestId = -1;
+\t\t// Entity order matters for ties. The original iterates the authoritative
+\t\t// world's character list, not client IDs in ascending order.
+\t\tfor(CCharacter *pCharacter = static_cast<CCharacter *>(pGameClient->m_GameWorld.FindFirst(CGameWorld::ENTTYPE_CHARACTER));
+\t\t\tpCharacter; pCharacter = static_cast<CCharacter *>(pCharacter->TypeNext()))
+\t\t{
+\t\t\tconst int Id = pCharacter->GetId();
+\t\t\tif(Id < 0 || Id >= MAX_CLIENTS || Id == SourceId)
+\t\t\t\tcontinue;
+\t\t\tconst auto &Other = pGameClient->m_aClients[Id];
+\t\t\tif(!Other.m_Active || Other.m_Solo || Other.m_Spec || !pGameClient->m_Teams.CanCollide(Id, SourceId))
+\t\t\t\tcontinue;
+\t\t\tconst float Dist = distance(Position, Other.m_Predicted.m_Pos);
+\t\t\tif(BestId == -1 || Dist < Best)
+\t\t\t{
+\t\t\t\tBestId = Id;
+\t\t\t\tBest = Dist;
+\t\t\t}
+\t\t}
+\t\treturn BestId;
+\t}
+
+\tCNetObj_PlayerInput CFakeAim::FakeAim(CGameClient *pGameClient, CNetObj_PlayerInput Input)
+\t{
+\t\t// State(pGameClient) исходника — единственный разделяемый слот.
+\t\tCSlot &Current = m_State;
+\t\tif(!g_Config.m_KrxFakeAim || Spectating(pGameClient) || !Playing(pGameClient, Input))
+\t\t\treturn Input;
+\t\tconst int Slot = g_Config.m_ClDummy;
+\t\tconst int PreviousHook = pGameClient->m_Controls.m_aLastData[Slot].m_Hook;
+\t\tif(((Input.m_Hook != 1 || PreviousHook != 0) && !(Input.m_Fire & 1)) || g_Config.m_KrxFakeAimMode == 1)
+\t\t{
+\t\t\tvec2 ClosestDirection(0, 0);
+\t\t\tif(g_Config.m_KrxFakeAimMode == 5)
+\t\t\t{
+\t\t\t\tconst int Target = ClosestPlayer(pGameClient);
+\t\t\t\tif(Target >= 0)
+\t\t\t\t\tClosestDirection = pGameClient->m_aClients[Target].m_Predicted.m_Pos - pGameClient->m_LocalCharacterPos;
+\t\t\t}
+\t\t\tAim(Input, FakeAimVector(g_Config.m_KrxFakeAimMode, g_Config.m_KrxFakeAimSpeed,
+\t\t\t\t\t   pGameClient->m_Controls.m_aMousePos[Slot], Input, PreviousHook, ClosestDirection,
+\t\t\t\t\t   pGameClient->m_Controls.GetMaxMouseDistance(), Current.m_RobotAim, Current.m_SpinAngle,
+\t\t\t\t\t   g_Config.m_KrxFakeAimMode == 3 ? RandomRadians() : 0.0f));
+\t\t}
+\t\treturn Input;
+\t}
+
+\tvoid CFakeAim::AfterAvoid(CGameClient *pGameClient)
+\t{
+\t\t// PrepareContext (CMiscFeatures): онлайн-гейт и сброс слота.
+\t\tif(pGameClient->Client()->State() != IClient::STATE_ONLINE)
+\t\t{
+\t\t\tOnReset();
+\t\t\treturn;
+\t\t}
+\t\tconst int Slot = g_Config.m_ClDummy;
+\t\tconst int ClientId = pGameClient->m_aLocalIds[Slot];
+\t\tif(ClientId < 0 || ClientId >= MAX_CLIENTS || !pGameClient->m_aClients[ClientId].m_Active)
+\t\t{
+\t\t\tm_State = {};
+\t\t\treturn;
+\t\t}
+\t\tif(m_State.m_ClientId != ClientId)
+\t\t{
+\t\t\tm_State = {};
+\t\t\tm_State.m_ClientId = ClientId;
+\t\t}
+\t\t// 0x14026d2d0 calls the authoritative b4450 frozen predicate, not a
+\t\t// predicted collision. Send once per continuous frozen period.
+\t\tconst bool Frozen = pGameClient->m_Snap.m_pLocalCharacter &&
+\t\t\t\t    !pGameClient->m_Snap.m_SpecInfo.m_Active && IsKrxCharacterFrozen(pGameClient, ClientId);
+\t\tif(g_Config.m_KrxKillOnFreeze && Frozen && !m_State.m_WasFrozen)
+\t\t{
+\t\t\t// Original 0x140210700 also sends to the other connection when
+\t\t\t// copy-moves is enabled; use the shared DDNet sender for both.
+\t\t\tpGameClient->SendKill();
+\t\t}
+\t\tm_State.m_WasFrozen = g_Config.m_KrxKillOnFreeze && Frozen;
+\t\t// m_KrxMovementPreTas.FindTunes() из исходника опущен — TAS в
+\t\t// melancholy не портирован.
+\t}
+
+} // namespace OpenKrx
+"""
+
+wr(os.path.join(AV, "fake_aim.h"), FAKE_AIM_H)
+wr(os.path.join(AV, "fake_aim.cpp"), FAKE_AIM_CPP)
+ok("avoid/fake_aim.h + avoid/fake_aim.cpp (крх ложный прицел + суицид при фризе)")
+
+# --- B. CMakeLists.txt: fake_aim в сборку
+sub("CMakeLists.txt",
+    "    avoid/unfreeze_bot.cpp\n    avoid/unfreeze_bot.h\n",
+    "    avoid/unfreeze_bot.cpp\n    avoid/unfreeze_bot.h\n"
+    "    avoid/fake_aim.cpp\n    avoid/fake_aim.h\n",
+    "CMakeLists: avoid/fake_aim")
+
+# --- C. config_variables.h: старый спинбот удалён, крх-конфиги добавлены
+sub("src/engine/shared/config_variables.h",
+    '// Fake Aim spinbot\n'
+    'MACRO_CONFIG_INT(ClZzSpinAim, cl_zz_spinaim, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim spinbot")\n'
+    'MACRO_CONFIG_INT(ClZzSpinAimMode, cl_zz_spinaim_mode, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim mode 0=spin 1=random")\n'
+    'MACRO_CONFIG_INT(ClZzSpinAimSpeed, cl_zz_spinaim_speed, 50, 0, 75, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim speed")\n'
+    'MACRO_CONFIG_INT(ClZzSpinAimShowMe, cl_zz_spinaim_showme, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim visible spin")\n'
+    'MACRO_CONFIG_INT(ClZzSpinAimTarget, cl_zz_spinaim_target, 1, 0, 2, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Fake Aim target 0=main 1=dummy 2=both")\n',
+    "",
+    "config_variables.h: старый Fake Aim spinbot удалён (5 конфигов)")
+
+sub("src/engine/shared/config_variables.h",
+    'MACRO_CONFIG_INT(KrxUnfreezeBotMod, krx_unfreezebot_mod, 0, 0, 7, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_HIDDEN, "krx unfreeze bot bind modifier mask")\n',
+    'MACRO_CONFIG_INT(KrxUnfreezeBotMod, krx_unfreezebot_mod, 0, 0, 7, CFGFLAG_CLIENT | CFGFLAG_SAVE | CFGFLAG_HIDDEN, "krx unfreeze bot bind modifier mask")\n'
+    '// КРХ самоубийство при попадании в фриз (Nullcki @ 59e02c5, config_variables.h:791)\n'
+    'MACRO_CONFIG_INT(KrxKillOnFreeze, krx_killonfreeze, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Kills on freeze on/off")\n'
+    '// КРХ ложный прицел (Nullcki @ 59e02c5, config_variables.h:829-833)\n'
+    'MACRO_CONFIG_INT(KrxFakeAim, krx_fake_aim, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_fake_aim")\n'
+    'MACRO_CONFIG_INT(KrxFakeAimSendAlways, krx_fake_aim_send_always, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_fake_aim_send_always")\n'
+    'MACRO_CONFIG_INT(KrxFakeAimMode, krx_fake_aim_mode, 0, 0, 5, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_fake_aim_mode")\n'
+    'MACRO_CONFIG_INT(KrxFakeAimVisible, krx_fake_aim_visible, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_fake_aim_visible")\n'
+    'MACRO_CONFIG_INT(KrxFakeAimSpeed, krx_fake_aim_speed, 20, -50, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "krx_fake_aim_speed")\n'
+    '// Fly Bot из T-apk (Tater Plus, @ dcaa51d597, config_variables.h:507)\n'
+    'MACRO_CONFIG_INT(ClPlusFlyBot, cl_plus_flybot, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable fly bot")\n',
+    "config_variables.h: KrxKillOnFreeze + KrxFakeAim* + ClPlusFlyBot")
+
+# --- D. gameclient.h: инклуд + член m_KrxFakeAim
+sub("src/game/client/gameclient.h",
+    '#include "avoid/unfreeze_bot.h"\n',
+    '#include "avoid/unfreeze_bot.h"\n#include "avoid/fake_aim.h"\n',
+    "gameclient.h: include avoid/fake_aim.h")
+
+sub("src/game/client/gameclient.h",
+    "\tOpenKrx::CFent m_Fent;\n",
+    "\tOpenKrx::CFent m_Fent;\n"
+    "\t// КРХ ложный прицел + суицид при фризе (порт Nullcki @ 59e02c5).\n"
+    "\tOpenKrx::CFakeAim m_KrxFakeAim;\n",
+    "gameclient.h: OpenKrx::CFakeAim m_KrxFakeAim")
+
+# --- E. gameclient.cpp: OnReset
+sub("src/game/client/gameclient.cpp",
+    "\tm_RescueBots.OnReset();\n",
+    "\tm_RescueBots.OnReset();\n\tm_KrxFakeAim.OnReset();\n",
+    "gameclient.cpp: m_KrxFakeAim.OnReset()")
+
+# --- F. controls.cpp: старый спинбот удалён, крх-FakeAim/KillOnFreeze/FlyBot вшиты
+sub("src/game/client/components/controls.cpp",
+    '\tm_LastSendTime = time_get();\n'
+    '\tmem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));\n'
+    '\t// ============ Fake Aim spinbot (порт из aether-kn) ============\n'
+    '\t// Сохраняем реальную позицию, чтобы кручение её не сбивало\n'
+    '\tfor(int UnspunD = 0; UnspunD < NUM_DUMMIES; UnspunD++)\n'
+    '\t\tm_aUnspunPos[UnspunD] = m_aMousePos[UnspunD];\n\n'
+    '\tif(g_Config.m_ClZzSpinAim && g_Config.m_ClZzSpinAimSpeed > 0)\n'
+    '\t{\n'
+    '\t\tconst int SpinDummy = std::clamp(g_Config.m_ClDummy, 0, NUM_DUMMIES - 1);\n'
+    '\t\tstatic float s_aSpinAngle[NUM_DUMMIES] = {0.0f};\n'
+    '\t\tstatic int s_aSpinDir[NUM_DUMMIES] = {0};\n'
+    '\t\tauto SpinStep = [&](int D, bool TouchMouse) {\n'
+    '\t\t\tif(s_aSpinDir[D] == 0)\n'
+    '\t\t\t\ts_aSpinDir[D] = 1;\n'
+    '\t\t\tif(g_Config.m_ClZzSpinAimMode == 1)\n'
+    '\t\t\t{\n'
+    '\t\t\t\tif(rand() % 100 < 8)\n'
+    '\t\t\t\t\ts_aSpinDir[D] = -s_aSpinDir[D];\n'
+    '\t\t\t}\n'
+    '\t\t\telse\n'
+    '\t\t\t{\n'
+    '\t\t\t\ts_aSpinDir[D] = 1;\n'
+    '\t\t\t}\n'
+    '\t\t\ts_aSpinAngle[D] += (float)s_aSpinDir[D] * (float)std::clamp(g_Config.m_ClZzSpinAimSpeed, 0, 75) * 3.6f;\n'
+    '\t\t\tif(s_aSpinAngle[D] >= 360.0f)\n'
+    '\t\t\t\ts_aSpinAngle[D] -= 360.0f;\n'
+    '\t\t\telse if(s_aSpinAngle[D] < 0.0f)\n'
+    '\t\t\t\ts_aSpinAngle[D] += 360.0f;\n'
+    '\t\t\tconst float SpinRad = s_aSpinAngle[D] * pi / 180.0f;\n'
+    '\t\t\tfloat SpinRadius = length(m_aMousePos[D]);\n'
+    '\t\t\tif(SpinRadius < 200.0f)\n'
+    '\t\t\t\tSpinRadius = 300.0f;\n'
+    '\t\t\tconst vec2 Spun = vec2(std::cos(SpinRad), std::sin(SpinRad)) * SpinRadius;\n'
+    '\t\t\tif(TouchMouse && g_Config.m_ClZzSpinAimShowMe)\n'
+    '\t\t\t{\n'
+    '\t\t\t\tm_aMousePos[D] = Spun;\n'
+    '\t\t\t\tm_aMousePosOnAction[D] = Spun;\n'
+    '\t\t\t}\n'
+    '\t\t\tm_aInputData[D].m_TargetX = (int)Spun.x;\n'
+    '\t\t\tm_aInputData[D].m_TargetY = (int)Spun.y;\n'
+    '\t\t};\n'
+    '\t\tif(true)\n'
+    '\t\t{\n'
+    '\t\t\tconst bool HoldAim = (m_aInputData[SpinDummy].m_Hook != 0) || ((m_aInputData[SpinDummy].m_Fire & 1) != 0);\n'
+    '\t\t\tif(HoldAim)\n'
+    '\t\t\t{\n'
+    '\t\t\t\tm_aInputData[SpinDummy].m_TargetX = (int)m_aMousePos[SpinDummy].x;\n'
+    '\t\t\t\tm_aInputData[SpinDummy].m_TargetY = (int)m_aMousePos[SpinDummy].y;\n'
+    '\t\t\t}\n'
+    '\t\t\telse\n'
+    '\t\t\t\tSpinStep(SpinDummy, true);\n'
+    '\t\t}\n'
+    '\t\tfor(int D = 0; D < NUM_DUMMIES; D++)\n'
+    '\t\t{\n'
+    '\t\t\tif(D == SpinDummy)\n'
+    '\t\t\t\tcontinue;\n'
+    '\t\t\tif(D != 0 && !Client()->DummyConnected(D))\n'
+    '\t\t\t\tcontinue;\n'
+    '\t\t\tSpinStep(D, false);\n'
+    '\t\t}\n'
+    '\t}\n\n'
+    '\treturn sizeof(m_aInputData[0]);\n',
+    '\tm_LastSendTime = time_get();\n'
+    '\tmem_copy(pData, &m_aInputData[g_Config.m_ClDummy], sizeof(m_aInputData[0]));\n\n'
+    '\treturn sizeof(m_aInputData[0]);\n',
+    "controls.cpp: старый Fake Aim spinbot удалён полностью")
+
+sub("src/game/client/components/controls.cpp",
+    "m_ClassicAvoid.AdjustInput(GameClient(), m_aInputData[KrxSlot], KrxClientId);\n"
+    "\t\t\t// КРХ лазерный анфриз: после цепочки Avoid, до Rocket Save (порядок Nullcki).\n",
+    "m_ClassicAvoid.AdjustInput(GameClient(), m_aInputData[KrxSlot], KrxClientId);\n"
+    "\t\t\t// КРХ ложный прицел (CMediumBots::FakeAim) + самоубийство при попадании\n"
+    "\t\t\t// в фриз (CMiscFeatures::AfterAvoid) — как в KRX SnapInput: после\n"
+    "\t\t\t// Avoid/аимбота и до лазерного анфриза/Rocket Save (порядок Nullcki).\n"
+    "\t\t\tm_aInputData[KrxSlot] = GameClient()->m_KrxFakeAim.FakeAim(GameClient(), m_aInputData[KrxSlot]);\n"
+    "\t\t\tGameClient()->m_KrxFakeAim.AfterAvoid(GameClient());\n"
+    "\t\t\t// КРХ лазерный анфриз: после цепочки Avoid, до Rocket Save (порядок Nullcki).\n",
+    "controls.cpp: m_KrxFakeAim.FakeAim + AfterAvoid в цепочке")
+
+sub("src/game/client/components/controls.cpp",
+    "\t\t// Force a tick-rate packet while avoid is enabled; otherwise SnapInput may\n",
+    "\t\t// Fly Bot из T-apk (Tater Plus, @ dcaa51d597): полёт по стрелкам —\n"
+    "\t\t// вызов в SnapInput 1:1 с T-apk (до отправки пакета).\n"
+    "\t\tif(g_Config.m_ClPlusFlyBot)\n"
+    "\t\t\tFlyBot();\n"
+    "\t\telse if(m_FlyInfo.Posed)\n"
+    "\t\t\tm_FlyInfo.Posed = 0;\n"
+    "\t\t// Force a tick-rate packet while avoid is enabled; otherwise SnapInput may\n",
+    "controls.cpp: FlyBot в SnapInput")
+
+sub("src/game/client/components/controls.cpp",
+    "\t\tSend = Send || time_get() > m_LastSendTime + time_freq() / 25; // send at least 25 Hz\n",
+    "\t\tSend = Send || time_get() > m_LastSendTime + time_freq() / 25; // send at least 25 Hz\n"
+    "\t\t// КРХ ложный прицел: Send always (Nullcki controls.cpp:547).\n"
+    "\t\tSend = Send || (OpenKrx::KrxProfileActive() && g_Config.m_KrxFakeAimSendAlways);\n",
+    "controls.cpp: KrxFakeAimSendAlways")
+
+FLY_BOT_CPP = (
+    "// ============ Fly Bot (порт из T-apk @ dcaa51d597, Tater Plus) ============\n"
+    "void CControls::FlyBotUnGrabFastHook()\n"
+    "{\n"
+    "\tauto &InputData = m_aInputData[g_Config.m_ClDummy];\n"
+    "\tconst auto &LocalClient = GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId];\n\n"
+    "\tif(InputData.m_Hook)\n"
+    "\t{\n"
+    "\t\tif(LocalClient.m_Predicted.m_HookState != 4)\n"
+    "\t\t{\n"
+    "\t\t\tInputData.m_Hook = 0;\n"
+    "\t\t}\n"
+    "\t}\n"
+    "\telse\n"
+    "\t{\n"
+    "\t\tInputData.m_Hook = 1;\n"
+    "\t}\n"
+    "}\n\n"
+    "void CControls::FlyBot()\n"
+    "{\n"
+    "\tif(Input()->KeyIsPressed(KEY_UP))\n"
+    "\t{\n"
+    "\t\tm_FlyInfo.PrevPos.y -= 1.0f;\n"
+    "\t}\n"
+    "\telse if(Input()->KeyIsPressed(KEY_DOWN))\n"
+    "\t{\n"
+    "\t\tm_FlyInfo.PrevPos.y += 1.0f;\n"
+    "\t}\n\n"
+    "\telse if(Input()->KeyIsPressed(KEY_LEFT))\n"
+    "\t{\n"
+    "\t\tm_FlyInfo.PrevPos.x -= 1.0f;\n"
+    "\t}\n"
+    "\telse if(Input()->KeyIsPressed(KEY_RIGHT))\n"
+    "\t{\n"
+    "\t\tm_FlyInfo.PrevPos.x += 1.0f;\n"
+    "\t}\n\n"
+    "\tconst vec2 CurrentPos = GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_Predicted.m_Pos;\n"
+    "\tif(!m_FlyInfo.Posed)\n"
+    "\t{\n"
+    "\t\tm_FlyInfo.PrevPos = CurrentPos;\n"
+    "\t}\n"
+    "\tm_FlyInfo.Posed = true;\n\n"
+    "\tif(::length(CurrentPos - m_FlyInfo.PrevPos) > 50.0f)\n"
+    "\t{\n"
+    "\t\tm_FlyInfo.PrevPos = CurrentPos;\n"
+    "\t}\n\n"
+    "\tif(CurrentPos.y <= m_FlyInfo.PrevPos.y)\n"
+    "\t{\n"
+    "\t\tm_aInputData[g_Config.m_ClDummy].m_Hook = 0;\n"
+    "\t}\n"
+    "\telse\n"
+    "\t{\n"
+    "\t\tFlyBotUnGrabFastHook();\n"
+    "\t}\n\n"
+    "\tm_aInputData[g_Config.m_ClDummy].m_Direction =\n"
+    "\t\t(m_FlyInfo.PrevPos.x <= CurrentPos.x) ? -1 : 1;\n"
+    "}\n\n"
+    "void CControls::OnRender()\n")
+
+sub("src/game/client/components/controls.cpp",
+    "void CControls::OnRender()\n",
+    FLY_BOT_CPP,
+    "controls.cpp: FlyBot + FlyBotUnGrabFastHook (реализация)")
+
+# --- G. controls.h: m_aUnspunPos -> m_FlyInfo, декларации FlyBot
+sub("src/game/client/components/controls.h",
+    "\tvec2 m_aMousePosOnAction[NUM_DUMMIES];\n\tvec2 m_aUnspunPos[NUM_DUMMIES];\n\tvec2 m_aTargetPos[NUM_DUMMIES];\n",
+    "\tvec2 m_aMousePosOnAction[NUM_DUMMIES];\n"
+    "\t// Fly Bot из T-apk (Tater Plus): состояние «полёта» (порт 1:1).\n"
+    "\tstruct\n\t{\n"
+    "\t\tvec2 PrevPos;\n"
+    "\t\tint Posed;\n"
+    "\t} m_FlyInfo;\n"
+    "\tvec2 m_aTargetPos[NUM_DUMMIES];\n",
+    "controls.h: m_FlyInfo (вместо m_aUnspunPos)")
+
+sub("src/game/client/components/controls.h",
+    "\tbool CheckNewInput();\n\nprivate:\n",
+    "\tbool CheckNewInput();\n"
+    "\t// Fly Bot из T-apk (Tater Plus, @ dcaa51d597): полёт по стрелкам.\n"
+    "\tvoid FlyBot();\n"
+    "\tvoid FlyBotUnGrabFastHook();\n\nprivate:\n",
+    "controls.h: FlyBot/FlyBotUnGrabFastHook декларации")
+
+# --- H. players.cpp: крх Visible (рисуем тий по отправляемому прицелу)
+sub("src/game/client/components/players.cpp",
+    "#include <engine/shared/config.h>\n",
+    "#include <engine/shared/config.h>\n#include <engine/shared/client_profile.h>\n",
+    "players.cpp: include client_profile")
+
+sub("src/game/client/components/players.cpp",
+    "float CPlayers::GetPlayerTargetAngle(\n"
+    "\tconst CNetObj_Character *pPrevChar,\n"
+    "\tconst CNetObj_Character *pPlayerChar,\n"
+    "\tint ClientId,\n"
+    "\tfloat Intra)\n"
+    "{\n",
+    "float CPlayers::GetPlayerTargetAngle(\n"
+    "\tconst CNetObj_Character *pPrevChar,\n"
+    "\tconst CNetObj_Character *pPlayerChar,\n"
+    "\tint ClientId,\n"
+    "\tfloat Intra)\n"
+    "{\n"
+    "\t// КРХ ложный прицел (порт Nullcki, players.cpp:153): рисуем свой тий\n"
+    "\t// по тому прицелу, который отправляется серверу (krx_fake_aim_visible).\n"
+    "\tif((OpenKrx::KrxProfileActive() && g_Config.m_KrxFakeAim) && g_Config.m_KrxFakeAimVisible &&\n"
+    "\t\tClientId == GameClient()->m_aLocalIds[g_Config.m_ClDummy] && !GameClient()->m_Snap.m_SpecInfo.m_Active)\n"
+    "\t{\n"
+    "\t\tconst auto &Input = GameClient()->m_Controls.m_aInputData[g_Config.m_ClDummy];\n"
+    "\t\treturn angle(vec2(Input.m_TargetX, Input.m_TargetY));\n"
+    "\t}\n",
+    "players.cpp: GetPlayerTargetAngle — крх Visible")
+
+# --- I. zz_menus_settings.cpp (вкладка «Разное»): крх-карточка Fake aim + Kill on freeze + Fly Bot
+sub("src/game/client/components/tclient/zz_menus_settings.cpp",
+    '                DoGoldCheckAuto(&g_Config.m_ClZzSpinAim,\n'
+    '                        Localize("Fake Aim"), &g_Config.m_ClZzSpinAim,\n'
+    '                        &Inner, LineSize);\n'
+    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                DoGoldScrollbar(&g_Config.m_ClZzSpinAimSpeed,\n'
+    '                        &g_Config.m_ClZzSpinAimSpeed, &Button,\n'
+    '                        Localize("Speed"), 0, 75);\n'
+    '                DoGoldCheckAuto(&g_Config.m_ClZzSpinAimShowMe,\n'
+    '                        Localize("Show me"), &g_Config.m_ClZzSpinAimShowMe,\n'
+    '                        &Inner, LineSize);\n',
+    '                // КРХ ложный прицел (Fake aim) — порт Nullcki @ 59e02c5,\n'
+    '                // настройки 1:1 с карточкой «Fake aim» крх-меню.\n'
+    '                Inner.HSplitTop(LineSize, &Label, &Inner);\n'
+    '                Ui()->DoLabel(&Label, Localize("Fake aim"), 15.0f, TEXTALIGN_ML);\n'
+    '                DoGoldCheckAuto(&g_Config.m_KrxFakeAim,\n'
+    '                        Localize("Enable"), &g_Config.m_KrxFakeAim,\n'
+    '                        &Inner, LineSize);\n'
+    '                if(g_Config.m_KrxFakeAim)\n'
+    '                {\n'
+    '                        Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                        DoGoldCheckAuto(&g_Config.m_KrxFakeAimSendAlways,\n'
+    '                                Localize("Send always"), &g_Config.m_KrxFakeAimSendAlways,\n'
+    '                                &Inner, LineSize);\n'
+    '                        Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                        DoGoldCheckAuto(&g_Config.m_KrxFakeAimVisible,\n'
+    '                                Localize("Visible"), &g_Config.m_KrxFakeAimVisible,\n'
+    '                                &Inner, LineSize);\n'
+    '                        CUIRect ModeLabel, ModeDropDown;\n'
+    '                        Inner.HSplitTop(LineSize, &ModeLabel, &Inner);\n'
+    '                        Ui()->DoLabel(&ModeLabel, Localize("Mode"), 14.0f, TEXTALIGN_ML);\n'
+    '                        std::array<const char *, 6> aKrxFakeAimModes = {"Mouse pos", "Robot aim", "Spinbot", "Random", "Fake angles", "Aimbot troll aim"};\n'
+    '                        static CUi::SDropDownState s_KrxFakeAimModeDropDownState;\n'
+    '                        static CScrollRegion s_KrxFakeAimModeDropDownScrollRegion;\n'
+    '                        s_KrxFakeAimModeDropDownState.m_SelectionPopupContext.m_pScrollRegion = &s_KrxFakeAimModeDropDownScrollRegion;\n'
+    '                        const int OldKrxFakeAimMode = std::clamp(g_Config.m_KrxFakeAimMode, 0, 5);\n'
+    '                        Inner.HSplitTop(LineSize, &ModeDropDown, &Inner);\n'
+    '                        const int NewKrxFakeAimMode = DoGoldDropDown(&ModeDropDown, OldKrxFakeAimMode, aKrxFakeAimModes.data(), (int)aKrxFakeAimModes.size(), s_KrxFakeAimModeDropDownState);\n'
+    '                        if(NewKrxFakeAimMode != OldKrxFakeAimMode)\n'
+    '                                g_Config.m_KrxFakeAimMode = NewKrxFakeAimMode;\n'
+    '                        if(g_Config.m_KrxFakeAimMode == 2)\n'
+    '                        {\n'
+    '                                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                                DoGoldScrollbar(&g_Config.m_KrxFakeAimSpeed,\n'
+    '                                        &g_Config.m_KrxFakeAimSpeed, &Button,\n'
+    '                                        Localize("Speed"), -50, 50);\n'
+    '                        }\n'
+    '                }\n'
+    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                // КРХ самоубийство при попадании в фриз (Nullcki @ 59e02c5):\n'
+    '                // автоматически умирает при заморозке.\n'
+    '                DoGoldCheckAuto(&g_Config.m_KrxKillOnFreeze,\n'
+    '                        Localize("Kill on freeze"), &g_Config.m_KrxKillOnFreeze,\n'
+    '                        &Inner, LineSize);\n',
+    "zz_menus_settings.cpp: крх Fake aim + Kill on freeze (вместо старого спинбота)")
+
+sub("src/game/client/components/tclient/zz_menus_settings.cpp",
+    '                        Localize("Follow distance (tiles)"), 0, 30);\n'
+    '        }\n\n'
+    '        {\n'
+    '                CUIRect Inner;\n'
+    '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
+    '                        Localize("Follow distance (tiles)"), 0, 30);\n'
+    '        }\n\n'
+    '        // Fly Bot из T-apk (Tater Plus, @ dcaa51d597) — вкладка «Разное».\n'
+    '        {\n'
+    '                CUIRect Inner;\n'
+    '                DoFeaturePanel(RightView, 60.0f, Localize("Fly Bot"), Inner);\n'
+    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
+    '                DoGoldCheckAuto(&g_Config.m_ClPlusFlyBot,\n'
+    '                        Localize("Enable fly bot"), &g_Config.m_ClPlusFlyBot,\n'
+    '                        &Inner, LineSize);\n'
+    '                Inner.HSplitTop(LineSize, &Label, &Inner);\n'
+    '                Ui()->DoLabel(&Label, Localize("Control: arrow keys"), 13.0f, TEXTALIGN_ML);\n'
+    '        }\n\n'
+    '        {\n'
+    '                CUIRect Inner;\n'
+    '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
+    "zz_menus_settings.cpp: панель Fly Bot в «Разном»")
 
 # ---------------------------------------------------------------- отчёт
 print("== patch_melancholy: применено %d, ошибок %d" % (len(OK), len(FAIL)))
