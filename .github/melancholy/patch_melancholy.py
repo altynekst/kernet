@@ -7772,95 +7772,9 @@ sub('src/game/client/components/tclient/zz_menus_settings.cpp',
     _MEL_FNG_ANCHOR, _MEL_FNG_REPL,
     'zz_menus_settings.cpp: Свои тайлы во вкладке FNG (v1.1.13)')
 
-# ================================================================ 17. v1.1.14: Макс буст сенсы (вертолёт)
-print("== секция 17: v1.1.14 — макс буст сенсы во вкладке «Разное»")
-
-# 17.1 конфиги
-sub('src/engine/shared/config_variables.h',
-    'MACRO_CONFIG_INT(ClZzFngMapTiles, cl_zz_fng_map_tiles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FNG: do not mask custom entity tiles (show map custom tiles)")\n',
-    'MACRO_CONFIG_INT(ClZzFngMapTiles, cl_zz_fng_map_tiles, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "FNG: do not mask custom entity tiles (show map custom tiles)")\n'
-    '// Melancholy v1.1.14: Макс буст сенсы (Разное) — прицел крутится как вертолёт\n'
-    'MACRO_CONFIG_INT(ClMxSensBoost, cl_mx_sens_boost, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Enable max sens boost (helicopter aim)")\n'
-    'MACRO_CONFIG_INT(ClMxSensBoostMult, cl_mx_sens_boost_mult, 100, 1, 100, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Max sens boost multiplier (x1..x100)")\n',
-    'config_variables.h: макс буст сенсы (v1.1.14)')
-
-# 17.2 controls.cpp: аппаратные мышь/джойстик — множитель дельты в OnCursorMove
-sub('src/game/client/components/controls.cpp',
-    '\tm_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor;\n',
-    '\t// Melancholy v1.1.14: макс буст сенсы\n'
-    '\tconst float MelSensBoost = g_Config.m_ClMxSensBoost ? (float)g_Config.m_ClMxSensBoostMult : 1.0f;\n'
-    '\tm_aMousePos[g_Config.m_ClDummy] += vec2(x, y) * Factor * MelSensBoost;\n',
-    'controls.cpp: буст в OnCursorMove')
-
-# 17.3 touch_controls.cpp: джойстик прицела в спектаторе — множитель дельты
-sub('src/game/client/components/touch_controls.cpp',
-    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -m_AccumulatedDelta * WorldScreenSize;\n',
-    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -m_AccumulatedDelta * WorldScreenSize *\n'
-    '\t\t\t\t(g_Config.m_ClMxSensBoost ? (float)g_Config.m_ClMxSensBoostMult : 1.0f); // Melancholy v1.1.14\n',
-    'touch_controls.cpp: буст джойстика (spec, множитель)')
-
-# 17.4 touch_controls.cpp: джойстик прицела в игре (абсолютный) — множитель УГЛА
-sub('src/game/client/components/touch_controls.cpp',
-    '\t\tconst vec2 AbsolutePosition = (m_ActivePosition - vec2(0.5f, 0.5f)) * 2.0f;\n'
-    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] = AbsolutePosition * (Controls.GetMaxMouseDistance() - Controls.GetMinMouseDistance()) + normalize(AbsolutePosition) * Controls.GetMinMouseDistance();\n',
-    '\t\tconst vec2 AbsolutePosition = (m_ActivePosition - vec2(0.5f, 0.5f)) * 2.0f;\n'
-    '\t\t// Melancholy v1.1.14: макс буст сенсы — угол прицела умножается\n'
-    '\t\tvec2 MelBoostPosition = AbsolutePosition;\n'
-    '\t\tif(g_Config.m_ClMxSensBoost && length(AbsolutePosition) > 0.0001f)\n'
-    '\t\t\tMelBoostPosition = rotate(AbsolutePosition, ((float)g_Config.m_ClMxSensBoostMult - 1.0f) * atan2f(AbsolutePosition.y, AbsolutePosition.x));\n'
-    '\t\tControls.m_aMousePos[g_Config.m_ClDummy] = MelBoostPosition * (Controls.GetMaxMouseDistance() - Controls.GetMinMouseDistance()) + normalize(MelBoostPosition) * Controls.GetMinMouseDistance();\n',
-    'touch_controls.cpp: буст джойстика (in-game, угол)')
-
-# 17.5 touch_controls.cpp: direct touch в спектаторе — множитель дельты
-sub('src/game/client/components/touch_controls.cpp',
-    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -DirectFingerState.m_Delta * WorldScreenSize;\n',
-    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] += -DirectFingerState.m_Delta * WorldScreenSize *\n'
-    '\t\t\t\t(g_Config.m_ClMxSensBoost ? (float)g_Config.m_ClMxSensBoostMult : 1.0f); // Melancholy v1.1.14\n',
-    'touch_controls.cpp: буст direct touch (spec, множитель)')
-
-# 17.6 touch_controls.cpp: direct touch в игре (абсолютный) — множитель УГЛА
-sub('src/game/client/components/touch_controls.cpp',
-    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] = (DirectFingerState.m_Position - vec2(0.5f, 0.5f)) * WorldScreenSize;\n'
-    '\t\t\tControls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::ABSOLUTE;\n',
-    '\t\t\t// Melancholy v1.1.14: макс буст сенсы — угол прицела умножается\n'
-    '\t\t\tvec2 MelDirectPos = (DirectFingerState.m_Position - vec2(0.5f, 0.5f)) * WorldScreenSize;\n'
-    '\t\t\tif(g_Config.m_ClMxSensBoost && length(MelDirectPos) > 0.0001f)\n'
-    '\t\t\t\tMelDirectPos = rotate(MelDirectPos, ((float)g_Config.m_ClMxSensBoostMult - 1.0f) * atan2f(MelDirectPos.y, MelDirectPos.x));\n'
-    '\t\t\tControls.m_aMousePos[g_Config.m_ClDummy] = MelDirectPos;\n'
-    '\t\t\tControls.m_aMouseInputType[g_Config.m_ClDummy] = CControls::EMouseInputType::ABSOLUTE;\n',
-    'touch_controls.cpp: буст direct touch (in-game, угол)')
-
-# 17.7 вкладка «Разное»: карточка «Макс буст сенсы» после «Фокус режим»
-sub('src/game/client/components/tclient/zz_menus_settings.cpp',
-    '        }\n\n'
-    '        {\n'
-    '                CUIRect Inner;\n'
-    '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
-    '        }\n\n'
-    '        // Melancholy v1.1.14: Макс буст сенсы — прицел крутится как вертолёт.\n'
-    '        {\n'
-    '                CUIRect Inner;\n'
-    '                DoFeaturePanel(RightView, 106.0f, Localize("Макс буст сенсы"), Inner);\n'
-    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
-    '                DoGoldCheckAuto(&g_Config.m_ClMxSensBoost,\n'
-    '                        Localize("Включить"), &g_Config.m_ClMxSensBoost,\n'
-    '                        &Inner, LineSize);\n'
-    '                Inner.HSplitTop(LineSize, &Button, &Inner);\n'
-    '                DoGoldScrollbar(&g_Config.m_ClMxSensBoostMult,\n'
-    '                        &g_Config.m_ClMxSensBoostMult, &Button,\n'
-    '                        Localize("Множитель"), 1, 100);\n'
-    '                Inner.HSplitTop(LineSize, &Label, &Inner);\n'
-    '                Ui()->DoLabel(&Label, Localize("100 = вертолёт"), 13.0f, TEXTALIGN_ML);\n'
-    '        }\n\n'
-    '        {\n'
-    '                CUIRect Inner;\n'
-    '                DoFeaturePanel(LeftView, 40.0f, Localize("Smart Double Jump"), Inner);\n',
-    'zz_menus_settings.cpp: панель «Макс буст сенсы» в «Разном» (v1.1.14)')
-
-
-
-
-
+# 17. v1.1.14 (макс буст сенсы / вертолёт) — ОТКАЧЕНА в v1.1.16 по решению:
+#    сенса возвращена к ванильной, секция удалена целиком (патчер строит
+#    с нуля, остальные секции не затронуты).
 # ================================================================ 18. v1.1.15: Pseudofly (вкладка «Полёт», старый флай удалён)
 print("== секция 18: v1.1.15 — Pseudofly вместо старого флая")
 
