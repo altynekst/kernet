@@ -123,6 +123,6 @@ jobs:
             --notes "Melancholy = kernet + порт крх-авойда из Nullcki @ ${NULLCKI_SHA}.
           Вкладка: Настройки -> KernelNet -> Avoid (дропдаун агентов: Basic/Legit/Blatant/Fent Bot/Pilot Bot).
           Лазерный анфриз (Auto Unfreeze + хоткей): Настройки -> KernelNet -> Разное.
-          Melancholy в новогоднем стиле, крутилки золотые; Визуал без Тем и Соотношения сторон.
+          Весь интерфейс в новогоднем стиле, фиолетовая подсветка удалена; крутилки золотые; Визуал без Тем и Соотношения сторон.
           Ставится поверх прошлых сборок melancholy — подпись та же." \
             --latest || gh release upload "melancholy-v${{ github.run_number }}" artifacts/*.apk --clobber
